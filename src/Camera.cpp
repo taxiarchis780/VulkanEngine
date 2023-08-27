@@ -7,7 +7,7 @@ Camera::Camera(float Winwidth, float Winheight)
 	height = Winheight;
 }
 
-void Camera::UpdateMatrices(float FOV, Model* Model) // do not touch ever again for the love of god and everything that you love YOU HAVE SPENT HOURS FOR SOME FUCKING REASON SRT DOES NOT WORK BUT STR WORKS SO STFU
+void Camera::UpdateMatrices(float FOV, Model* Model)
 {
 	model = glm::mat4(1.0f);
 	glm::mat4 scaleMat = glm::scale(Model->scaleVec);
