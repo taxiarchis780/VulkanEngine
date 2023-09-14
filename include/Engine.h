@@ -12,9 +12,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
+#include <imgui_stdlib.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 #include <ImGuizmo.h>
+#include <ThreadManager.h>
 #include <tinylogger.h>
 #include <json.hpp>
 #include <Model.h>
@@ -24,6 +26,7 @@
 #include <sys/stat.h>
 #include <chrono>
 #include <thread>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 #include <set>
@@ -34,6 +37,7 @@
 #include <limits>
 #include <algorithm>
 #include <cstdlib>
+
 
 using json = nlohmann::ordered_json;
 
@@ -61,7 +65,18 @@ public:
 
 private:
     uint32_t WIDTH, HEIGHT = 0;
-
+    std::vector<std::string> model_paths;
+    std::vector<std::string> texture_paths;
+    std::vector<std::string> scene_paths;
+    bool addModel = false;
+    bool editScene = false;
+    bool firstScene = true;
+    
+    std::string texture_path;
+    std::string model_path;
+    std::string scene_path;
+    std::string scene_name;
+    int currentItemInListBox = 0;
     uint32_t currentFrame = 0;
     const char* TITLE;
     const char* VERSION;
@@ -70,11 +85,17 @@ private:
     bool LockImGui = false;
     bool lightTranslateEnable = false;
     bool shouldDestroy = false;
+    bool shouldUpdatePipeline = true;
     float FOV = 90.0f;
     float RotDegrees;
     double lastTime = 0.0;
+    double lastTime1 = 0.0;
+    uint32_t statsFaces = 0;
     int nbFrames = 0;
-    unsigned int statsVert = 0;
+
+    std::vector<std::thread*> workers;
+    std::mutex mutex;
+    
     size_t sceneSize;
     Model* mCurrentSelectedModel;
     std::vector<Model*> scene;
@@ -114,6 +135,7 @@ private:
     std::vector<VkImageView> swapChainImageViews;
     std::vector<VkFramebuffer> swapChainFramebuffers;
     std::vector<VkDescriptorSet> descriptorSets;
+    ThreadMgr* thrdMgr;
     
     struct QueueFamilyIndices
     {
@@ -138,23 +160,9 @@ private:
         "VK_LAYER_KHRONOS_validation"
     };
 
-    //std::vector<const char*> modelLoadPaths =
-    //{
-    //    "models/laocoon3.obj",
-    //    "models/viking_room_scaled.obj",
-    //    "models/teapot_with_material.obj",
-    //    "models/floor.obj",
-    //};
-
-    //std::vector<const char*> textureLoadPaths =
-    //{
-    //    "textures/laocoon_tex.jpg",
-    //    "textures/viking_room.png",
-    //    "textures/teapot.png",
-    //    "textures/floor.jpg",
-    //};
+    
     void writeToFile(std::vector<Model*> scene);
-    void loadFromFile1();
+    void loadFile(std::string fileName);
     json j;
     void enableDebugging() { enableValidationLayers = !enableValidationLayers; };
     void initWindow();
@@ -199,10 +207,11 @@ private:
     void renderImGui();
     void loadScene();
     void addtoScene(Model* model);
-    void traceDir(std::string directory);
+    void traceDir(std::string modelDirectory, std::string textureDirectory);
     bool isDeviceSuitable(VkPhysicalDevice device);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     void createImGuiDP();
+    void traceScenesDir(std::string sceneDirectory);
     void cleanUpModel(Model* model);
     int rateDeviceSuitability(VkPhysicalDevice device);
     void updateImGui(VkCommandBuffer commandBuffer);
@@ -228,6 +237,10 @@ private:
     //bool hasStencilComponent(VkFormat format);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void cleanup();
+
+
+
+    
 };
 
 #endif

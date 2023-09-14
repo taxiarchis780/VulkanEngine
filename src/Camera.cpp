@@ -7,10 +7,12 @@ Camera::Camera(float Winwidth, float Winheight)
 	height = Winheight;
 }
 
-void Camera::UpdateMatrices(float FOV, Model* Model) // do not touch ever again for the love of god and everything that you love YOU HAVE SPENT HOURS FOR SOME FUCKING REASON SRT DOES NOT WORK BUT STR WORKS SO STFU
+void Camera::UpdateMatrices(float FOV, Model* Model) 
 {
 	model = glm::mat4(1.0f);
 	glm::mat4 scaleMat = glm::scale(Model->scaleVec);
+	//if (Model->UUID == "laocoon" && Model->translationVec.z >= 0.0f)
+	//	Model->translationVec.z -= 0.001;
 	glm::mat4 translateMat = glm::translate(glm::mat4(1.0f), Model->translationVec);
 	glm::mat4 rotMat = glm::mat4(1.0f);
 	rotMat *= glm::rotate(glm::mat4(1.0f), Model->rotationVec.z, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -20,11 +22,14 @@ void Camera::UpdateMatrices(float FOV, Model* Model) // do not touch ever again 
 	Model->transform = model;
 	lightMat = glm::translate(lightPos);
 	view = glm::lookAt(Position, Position + Orientation, Up); // world space
-	proj = glm::perspective(glm::radians(FOV), width / (float)height, 0.1f, 1000.0f); // no idea
+	proj = glm::perspective(glm::radians(FOV), width / (float)height, 0.1f, 10000.0f); // no idea
+	
 }
+
 
 void Camera::UpdateInputs(GLFWwindow* window)
 {
+	
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 	{
 		glfwSetWindowShouldClose(window, true);
@@ -65,11 +70,11 @@ void Camera::UpdateInputs(GLFWwindow* window)
 		pitch += rotY;
 		if (pitch > 89.5f)
 		{
-			pitch = 89.5f;
+			pitch = 89.0f;
 			glfwSetCursorPos(window, (width / 2), (height / 2));
 			return;
 		}
-		if (pitch < -89.5f)
+		if (pitch < -89.0f)
 		{
 			pitch = -89.5f;
 			glfwSetCursorPos(window, (width / 2), (height / 2));
@@ -87,36 +92,37 @@ void Camera::UpdateInputs(GLFWwindow* window)
 	
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 	{
-		Position += speed *  glm::normalize(Orientation);
+		Position += velocity *  glm::normalize(Orientation);
 	}
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 	{
-		Position += speed * -glm::normalize(Orientation);
+		Position += velocity * -glm::normalize(Orientation);
 	}
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 	{
-		Position += speed * -glm::normalize(glm::cross(Orientation, Up));
+		Position += velocity * -glm::normalize(glm::cross(Orientation, Up));
 	}
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 	{
-		Position += speed *  glm::normalize(glm::cross(Orientation, Up));
+		Position += velocity *  glm::normalize(glm::cross(Orientation, Up));
 	}
 	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
 	{
-		Position += speed * Up;
+		Position += velocity * Up;
 	}
 	if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
 	{
-		Position += speed * -Up;
+		Position += velocity* -Up;
 	}
 	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
 	{
-		speed = 0.004f;
+		velocity = 0.1f * 4;
 	}
 	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_RELEASE)
 	{
-		speed = 0.001f;
+		velocity = 0.1f;
 	}
 	
 
 }
+

@@ -14,7 +14,7 @@ layout(location = 6) in vec3 alightColor;
 layout(location = 7) in vec3 mambient;
 layout(location = 8) in vec3 mdiffuse;
 layout(location = 9) in vec3 mspecular;
-layout(location = 10) in float mshininess;
+layout(location = 10) in vec3 mshininess;
 
 
 layout(location = 0) out vec4 outColor;
@@ -32,11 +32,13 @@ void main() {
     
     vec3 diffuse = (diff * mdiffuse )* alightColor;
     
+   
+    
     // specular
-    float specularStrength = 0.1f;
+    float specularStrength = mshininess.r;
     vec3 viewDir = normalize(aCameraPos - fragPos);
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.1f), mshininess);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.1f), mshininess.r);
     vec3 specular = specularStrength * (spec * alightColor * mspecular);
 
 

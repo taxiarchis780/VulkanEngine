@@ -11,6 +11,8 @@
 
 
 
+
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messaegSeverit, VkDebugUtilsMessageTypeFlagsEXT messsageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 {
     std::cerr << "ERROR in validation layer: " << pCallbackData->pMessage << std::endl;
@@ -55,11 +57,13 @@ void Engine::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMess
 
 void Engine::run()
 {
+    
     initWindow();
     initVulkan();
     if (enableimGUI)
     {
         initImGui();
+        traceDir("res/models/", "res/textures/");
     }
     mainLoop();
     cleanup();
@@ -103,17 +107,14 @@ void Engine::initVulkan()
     createColorResources();
     createDepthResources();
     createFramebuffers();
-    //sceneSize = modelLoadPaths.size();
+    if(firstScene)
+        scene_path = "main.json";
     camera = new Camera(swapChainExtent.width, swapChainExtent.height);
     loadScene();
-    loadFromFile1();
-    //scene[0]->translationVec = glm::vec3(-1.3f, 7.5f, -0.542f);
-    //scene[0]->rotationVec = glm::vec3(0.0f, 0.0f, -1.1f);
-    //scene[2]->translationVec = glm::vec3(-3.1f, 0.5f, 5.8f);
-    //scene[2]->rotationVec = glm::vec3(0.0f, 0.0f, 1.4f);
-    //scene[3]->translationVec = glm::vec3(0.0f, 0.0f, -1.151f);
+    loadFile(scene_path);
+
     
-    //jParser->loadFile(scene);
+    
     for (size_t i = 0; i < sceneSize; ++i)
     {
         createTextureImage(scene[i]);
@@ -200,14 +201,29 @@ void Engine::cleanupSwapChain()
     vkDestroySwapchainKHR(device, swapChain, nullptr);
 }
 
+/// <summary>
+/// You need dt in order to update everything at a specific time in order for physics (or anything that moves) to be not bound by the FPS
+/// that the application in running at e.g. on a computer that the engine runs at 2K FPS the camera is going to move faster than a computer 
+/// that is running at 60 FPS
+/// </summary>
 void Engine::mainLoop()
 {
     while(!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
         drawWindowTitle();
-        camera->UpdateInputs(window);
+        double currentTime = glfwGetTime(); // shitty implementation of dt
+        double deltaTime = currentTime - lastTime1;
+        
+        if (deltaTime >= 0.016) // update every 16 ms (updates 60 times per second)
+        {
+            camera->UpdateInputs(window);
+            lastTime1 = currentTime;
+        }
+        
         drawFrame();
+        
+        
     }
     vkDeviceWaitIdle(device);
 }
@@ -441,7 +457,7 @@ VkPresentModeKHR Engine::chooseSwapPresentMode(const std::vector<VkPresentModeKH
 {
     for(const auto& availablePresentMode : availablePresentModes)
     {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) { return availablePresentMode; } // Chad triple buffering
+        if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) { return availablePresentMode; }
         //
     }   
 
@@ -695,7 +711,7 @@ void Engine::createRenderPass()
     renderPassInfo.pDependencies = &dependency;
 
     if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create render pass!");
+        throw std::runtime_error("ERROR: failed to create render pass!");
     }
 }
 
@@ -843,7 +859,7 @@ void Engine::createFramebuffers()
         framebufferInfo.layers = 1;
 
         if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create framebuffer!");
+            throw std::runtime_error("ERROR: failed to create framebuffer!");
         }
     }
 }
@@ -919,29 +935,29 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
 
     VkDeviceSize offsets[] = { 0 };
 
-for (size_t i = 0; i < scene.size(); ++i)
-{
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &scene[i]->vertexBuffer, offsets);
-
-    vkCmdBindIndexBuffer(commandBuffer, scene[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &scene[i]->descriptorSets[currentFrame], 0, nullptr);
-
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(scene[i]->indices.size()), 1, 0, 0, 0);
-}
-
-if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS && !LockImGui)
-{
-    enableimGUI = !enableimGUI;
-    if (enableimGUI)
+    for (size_t i = 0; i < scene.size(); ++i)
     {
-        io.ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &scene[i]->vertexBuffer, offsets);
+
+        vkCmdBindIndexBuffer(commandBuffer, scene[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &scene[i]->descriptorSets[currentFrame], 0, nullptr);
+
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(scene[i]->indices.size()), 1, 0, 0, 0);
     }
-    else {
-        io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
+    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS && !LockImGui)
+    {
+        enableimGUI = !enableimGUI;
+        if (enableimGUI)
+        {
+            io.ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+        }
+        else {
+            io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+        }
+        LockImGui = true;
     }
-    LockImGui = true;
-}
     if (glfwGetKey(window, GLFW_KEY_K) == GLFW_RELEASE)
     {
         LockImGui = false;
@@ -978,13 +994,90 @@ void Engine::renderImGui()
     static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
     ImGui::NewFrame();
 
+    
     ImGui::Begin("Components", 0, ImGuiWindowFlags_NoMove);
+    ImGui::Text("CURRENT SELECTED MODEL");
 
+    uint8_t count = 0;
+    for (size_t i = 0; i < scene.size(); ++i)
+    {
+        count++;
+        if (ImGui::RadioButton(std::to_string(i).c_str(), mCurrentSelectedModel == scene[i]))
+            mCurrentSelectedModel = scene[i];
+        if (count % 3 == 0)
+        {
+            count = 0;
+            ImGui::Spacing();
+            continue; 
+        }
+        
+        ImGui::SameLine();
+    }
+    if (ImGui::Checkbox("LightTranslate", &lightTranslateEnable) && lightTranslateEnable)
+    {
+        mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+    }
+    
+    ImGui::InputText("UUID", &mCurrentSelectedModel->UUID);
+    if (ImGui::Button("Generate UUID"))
+    {
+        GenerateUUID(mCurrentSelectedModel, 8, true);
+    }
+    ImGui::Checkbox("EditScene", &editScene);
+    if (editScene)
+    {
+        ImGui::InputText("SceneName", &scene_name);
+        if (ImGui::Button("Refresh"))
+        {
+            traceScenesDir("res/data/");
+        }
+        if (ImGui::BeginListBox("Scenes", ImVec2(200, 100))) {
+            static size_t item_current_idx = 0;
+            for (size_t i = 0; i < scene_paths.size(); ++i)
+            {
+                const bool isSelected = (item_current_idx == i);
+                if (ImGui::Selectable(scene_paths[i].c_str(), isSelected))
+                {
+                    item_current_idx = i;
+                    scene_path = scene_paths[i];
+                }
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndListBox();
+        }
+        if (ImGui::Button("LoadScene") && false) // using && to disable it // it is currently junky and unstable
+        {
+            vkDeviceWaitIdle(device);
+            cleanup();
+            firstScene = false;
+            run();
+            
+        }
+        if (ImGui::Button("SaveToSelected"))
+        {
+            writeToFile(scene);
+        } ImGui::SameLine();
+        if (ImGui::Button("SaveToInput"))
+        {
+            scene_path = scene_name;
+            writeToFile(scene);
+        }
+    }
+    
+    if (ImGui::Button("Update Graphics Pipeline"))
+    {
+        shouldUpdatePipeline = true;
+    }
+    
     ImGui::SliderFloat("FOV", &FOV, 10.0f, 120.0f, NULL);
     ImGui::SliderFloat3("ModelPos", glm::value_ptr(mCurrentSelectedModel->translationVec), -5.0f, 5.0f, NULL);
     ImGui::SliderFloat3("ModelRot", glm::value_ptr(mCurrentSelectedModel->rotationVec), 0.0f, 6.28f, NULL);
     ImGui::SliderFloat3("ModelScale", glm::value_ptr(mCurrentSelectedModel->scaleVec), 0.001f, 10.0f, NULL);
     ImGui::SliderFloat3("LightPos", glm::value_ptr(camera->lightPos), -5.0f, 5.0f, NULL);
+    
+    
+
     ImGui::Text("CURRENT GIZMO OPERATION:");
     if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
         mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
@@ -997,51 +1090,50 @@ void Engine::renderImGui()
     ImGui::SameLine();
     if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
         mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
-    ImGui::Text("CURRENT SELECTED MODEL");
+    
 
 
-    for (size_t i = 0; i < scene.size(); ++i)
-    {
-        if (ImGui::RadioButton(std::to_string(i).c_str(), mCurrentSelectedModel == scene[i]))
-            mCurrentSelectedModel = scene[i];
-        ImGui::SameLine();
-    }
-    if (ImGui::Checkbox("LightTranslate", &lightTranslateEnable) && lightTranslateEnable)
-    {
-        mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-    }
-
-
-    ImGui::NewLine();
+    //ImGuiColorEditFlags_PickerHueWheel
     ImGui::ColorPicker3("lightColor", glm::value_ptr(camera->lightColor), ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_NoAlpha);
     ImGui::Text("Selected Model Material");
     ImGui::SliderFloat3("Ambient", glm::value_ptr(mCurrentSelectedModel->material.ambient), 0.0f, 10.0f, NULL);
     ImGui::SliderFloat3("Diffuse", glm::value_ptr(mCurrentSelectedModel->material.diffuse), 0.0f, 10.0f, NULL);
     ImGui::SliderFloat3("Specular", glm::value_ptr(mCurrentSelectedModel->material.specular), 0.0f, 10.0f, NULL);
-    ImGui::SliderFloat("Shininess", &mCurrentSelectedModel->material.shininess, 0.0f, 10.0f, NULL);
+    ImGui::SliderFloat("Shininess", &mCurrentSelectedModel->material.shininess.r, 0.1f, 360.0f, NULL, ImGuiSliderFlags_Logarithmic);
     
     
-
+    ImGui::InputText("Model", &model_path);
+    ImGui::InputText("Texture", &texture_path);
     if (ImGui::Button("Add Model"))
     {
-        Model* cModel = new Model("models/monkey.obj", "textures/woman_nothing.png");
-        loadModel(cModel);
-        createTextureImage(cModel);
-        createTextureImageView(cModel);
-        createTextureSampler(cModel);
-        createVertexBuffer(cModel);
-        createIndexBuffer(cModel);
-        createUniformBuffers(cModel);
-        createDescriptorPool(cModel);
-        createDescriptorSets(cModel);
-        addtoScene(cModel);
+        Model* cModel = nullptr;
+        try {
+            cModel = new Model("models/" + model_path, "textures/" + texture_path);
+            GenerateUUID(cModel, 8, true);
+            loadModel(cModel);
+            createTextureImage(cModel);
+            createTextureImageView(cModel);
+            createTextureSampler(cModel);
+            createVertexBuffer(cModel);
+            createIndexBuffer(cModel);
+            createUniformBuffers(cModel);
+            createDescriptorPool(cModel);
+            createDescriptorSets(cModel);
+            addtoScene(cModel);
+            statsFaces += cModel->statsFaces;
+        }
+        catch(const std::exception& e){
+            delete cModel;
+            std::cerr << e.what() << std::endl;
+            
+        }
     }
     if (ImGui::Button("Delete Selected Model"))
     {
         std::vector<Model*> newScene;
         for (size_t i = 0; i < scene.size(); i++)
         {
-            if (strcmp(scene[i]->MODEL_PATH.c_str(), mCurrentSelectedModel->MODEL_PATH.c_str()))
+            if (strcmp(scene[i]->UUID.c_str(), mCurrentSelectedModel->UUID.c_str()))
             {
                 newScene.push_back(scene[i]);
             }
@@ -1054,17 +1146,57 @@ void Engine::renderImGui()
         {
             scene.push_back(newScene[i]);
         }
+        statsFaces -= mCurrentSelectedModel->statsFaces;
     }
-    if (ImGui::Button("Save"))
+     
+    ImGui::Checkbox("AddModel", &addModel);
+    if (addModel)
     {
-        writeToFile(scene);
+        if (ImGui::Button("Refresh"))
+        {
+            traceDir("res/models/", "res/textures/");
+        }
+        if (ImGui::BeginListBox("Models", ImVec2(200, 100))) {
+            static size_t item_current_idx = 0;
+            for (size_t i = 0; i < model_paths.size(); ++i)
+            {
+                const bool isSelected = (item_current_idx == i);
+                if (ImGui::Selectable(model_paths[i].c_str(), isSelected))
+                {
+                    item_current_idx = i;
+                    model_path = model_paths[i];
+                }
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndListBox();
+        }
+
+        if (ImGui::BeginListBox("Textures", ImVec2(200, 100))) {
+            static size_t item_current_idx2 = 0;
+            for (size_t i = 0; i < texture_paths.size(); ++i)
+            {
+                const bool isSelected = (item_current_idx2 == i);
+                if (ImGui::Selectable(texture_paths[i].c_str(), isSelected))
+                {
+                    item_current_idx2 = i;
+                    texture_path = texture_paths[i];
+                }
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::EndListBox();
+        }
+
     }
-    if (ImGui::Button("Load"))
-    {
-        traceDir("res/models/");
-    }
+    
+    
+    
     ImGui::End();
-    ImGui::Begin("Scene", 0, ImGuiWindowFlags_NoMove);
+
+    ImGui::SetNextWindowPos(ImVec2(swapChainExtent.width - 735 , 0));
+    ImGui::Begin("Scene", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
     
     if (ImGui::BeginTable("CameraPos", 4))
     {
@@ -1097,12 +1229,12 @@ void Engine::renderImGui()
         
     }
 
-    if (ImGui::BeginTable("Scene Details", 4))
+    if (ImGui::BeginTable("Scene Details", 3))
     {
         ImGui::TableSetupColumn("MODEL");
-        ImGui::TableSetupColumn("INDEX");
-        ImGui::TableSetupColumn("VERTICES");
-        ImGui::TableSetupColumn("INDICES");
+        ImGui::TableSetupColumn("ID");
+        ImGui::TableSetupColumn("TRIANGLES");
+        
         ImGui::TableHeadersRow();
 
         for (size_t i = 0; i < scene.size(); ++i)
@@ -1111,11 +1243,10 @@ void Engine::renderImGui()
             ImGui::TableNextColumn();
             ImGui::Text(scene[i]->MODEL_PATH.c_str());
             ImGui::TableNextColumn();
-            ImGui::Text("%d", i);
+            ImGui::Text(scene[i]->UUID.c_str());
             ImGui::TableNextColumn();
-            ImGui::Text("%d", scene[i]->vertices.size());
-            ImGui::TableNextColumn();
-            ImGui::Text("%d", scene[i]->indices.size());
+            ImGui::Text("%d", scene[i]->statsFaces);
+            
         }
         ImGui::EndTable();
     }
@@ -1142,17 +1273,37 @@ void Engine::renderImGui()
         {
             mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
         }
-        
-        
-        
-        
-        
+        //if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS)
+        //{
+        //    mCurrentSelectedModel = nullptr;
+        //}
+        if (false && glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS ) // this is the worst code i have ever written // currently doesn't work
+        {
+            
+            for (size_t i = 0; i < scene.size(); ++i)
+            {
+                scene[i]->collider.center = scene[i]->translationVec;
+                scene[i]->collider.depth = 80.0f;
+                scene[i]->collider.width = 50.0f;
+                scene[i]->collider.height = 100.0f;
 
+                bool collide = scene[i]->collider.rayIntersects(camera->Position, camera->Orientation);
+
+                if (collide)
+                {
+                    mCurrentSelectedModel = scene[i];
+                }
+                else {
+                    printf("False!");
+                }
+            }
+        }
+        
         ImGuizmo::SetOrthographic(false);
         ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
         ImGuizmo::SetRect(0, 0, swapChainExtent.width, swapChainExtent.height);
-        if (!lightTranslateEnable)
+        if (!lightTranslateEnable && mCurrentSelectedModel != nullptr)
         {
             ImGuizmo::Manipulate(glm::value_ptr(camera->view), glm::value_ptr(camera->proj), mCurrentGizmoOperation, mCurrentGizmoMode, glm::value_ptr(mCurrentSelectedModel->transform));
 
@@ -1206,11 +1357,22 @@ void Engine::drawFrame()
 {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
+
     if (shouldDestroy && scene.size())
     {
+        vkQueueWaitIdle(graphicsQueue);
         cleanUpModel(mCurrentSelectedModel);
         mCurrentSelectedModel = scene.back();
     }
+    if (shouldUpdatePipeline)
+    {
+        vkQueueWaitIdle(graphicsQueue);
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        createGraphicsPipeline();
+        shouldUpdatePipeline = false;
+    }
+    
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -1224,12 +1386,18 @@ void Engine::drawFrame()
         throw std::runtime_error("ERROR: failed to acquire swap chain image!");
     }
 
+    
+
     for (size_t i = 0; i < scene.size(); i++)
     {
         updateUniformBuffers(currentFrame, scene[i]);
     }
+
+    
+    
     
     recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
+    
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
     VkSubmitInfo submitInfo{};
@@ -1874,43 +2042,76 @@ bool Engine::hasStencilComponent(VkFormat format)
 */
 
 
-void Engine::loadFromFile1()
+void Engine::loadFile(std::string filename)
 {
-    std::ifstream f{"res/data/main.json"};
+    std::ifstream f{"res/data/" + filename};
     json j = json::parse(f);
-    
-    
-    
+
     for (size_t i = 0; i < sceneSize; ++i)
     {
-        scene[i]->translationVec = glm::vec3(j["Section2"][scene[i]->MODEL_PATH]["TRANSLATION"][0][0], j["Section2"][scene[i]->MODEL_PATH]["TRANSLATION"][0][1], j["Section2"][scene[i]->MODEL_PATH]["TRANSLATION"][0][2]);
-        scene[i]->rotationVec = glm::vec3(j["Section2"][scene[i]->MODEL_PATH]["ROTATION"][0][0], j["Section2"][scene[i]->MODEL_PATH]["ROTATION"][0][1], j["Section2"][scene[i]->MODEL_PATH]["ROTATION"][0][2]);
-        scene[i]->scaleVec = glm::vec3(j["Section2"][scene[i]->MODEL_PATH]["SCALE"][0][0], j["Section2"][scene[i]->MODEL_PATH]["SCALE"][0][1], j["Section2"][scene[i]->MODEL_PATH]["SCALE"][0][2]);
+        
+        scene[i]->translationVec = glm::vec3(j["Section2"][scene[i]->UUID]["TRANSLATION"][0][0], j["Section2"][scene[i]->UUID]["TRANSLATION"][0][1], j["Section2"][scene[i]->UUID]["TRANSLATION"][0][2]);
+        scene[i]->rotationVec = glm::vec3(j["Section2"][scene[i]->UUID]["ROTATION"][0][0], j["Section2"][scene[i]->UUID]["ROTATION"][0][1], j["Section2"][scene[i]->UUID]["ROTATION"][0][2]);
+        scene[i]->scaleVec = glm::vec3(j["Section2"][scene[i]->UUID]["SCALE"][0][0], j["Section2"][scene[i]->UUID]["SCALE"][0][1], j["Section2"][scene[i]->UUID]["SCALE"][0][2]);
 
     }
+    camera->Position = glm::vec3(j["Section3"]["CameraInfo"]["CameraPos"][0][0], j["Section3"]["CameraInfo"]["CameraPos"][0][1], j["Section3"]["CameraInfo"]["CameraPos"][0][2]);
+    camera->Orientation = glm::vec3(j["Section3"]["CameraInfo"]["CameraOrientation"][0][0], j["Section3"]["CameraInfo"]["CameraOrientation"][0][1], j["Section3"]["CameraInfo"]["CameraOrientation"][0][2]);
     camera->lightPos = glm::vec3(j["Section3"]["LightInfo"]["LightPos"][0][0], j["Section3"]["LightInfo"]["LightPos"][0][1], j["Section3"]["LightInfo"]["LightPos"][0][2]);
     camera->lightColor = glm::vec3(j["Section3"]["LightInfo"]["LightColor"][0][0], j["Section3"]["LightInfo"]["LightColor"][0][1], j["Section3"]["LightInfo"]["LightColor"][0][2]);
 }
 
 void Engine::writeToFile(std::vector<Model*> scene)
 {
-    std::ofstream f("res/data/main.json");
+    bool willNotReturn = false;
+    std::vector<std::string> ids;
+    ids.resize(scene.size());
+    for (size_t i = 0; i < scene.size(); ++i)
+    {
+        
+        if (scene[i]->UUID.empty())
+        {
+            std::string wrn = std::string("Empty UUID cannot serialize model with index: ") + std::to_string(i) + "\n";
+
+            tlog::warning(wrn);
+            willNotReturn = true;
+            
+        }
+        for (auto& id : ids)
+        {
+            if (!strcmp(scene[i]->UUID.c_str(), id.c_str()))
+            {
+                std::string wrn = std::string("UUID of model with index: ") + std::to_string(i) + " already exists\n";
+                tlog::warning(wrn);
+                willNotReturn = true;
+            }
+            
+        }
+        ids[i] = scene[i]->UUID;
+        
+    }
+    if (willNotReturn)
+        return;
+    std::ofstream f("res/data/" + scene_path);
     json j;
 
     for (size_t i = 0; i < scene.size(); ++i)
     {
+        
         j["Section1"]["ModelPaths"].push_back(json::string_t(scene[i]->MODEL_PATH));
         j["Section1"]["TexturePaths"].push_back(json::string_t(scene[i]->TEXTURE_PATH));
-
-        j["Section2"][scene[i]->MODEL_PATH]["TRANSLATION"].push_back({ json::number_float_t(scene[i]->translationVec.x), json::number_float_t(scene[i]->translationVec.y), json::number_float_t(scene[i]->translationVec.z) });
-        j["Section2"][scene[i]->MODEL_PATH]["ROTATION"].push_back({ json::number_float_t(scene[i]->rotationVec.x), json::number_float_t(scene[i]->rotationVec.y), json::number_float_t(scene[i]->rotationVec.z) });
-        j["Section2"][scene[i]->MODEL_PATH]["SCALE"].push_back({ json::number_float_t(scene[i]->scaleVec.x), json::number_float_t(scene[i]->scaleVec.y), json::number_float_t(scene[i]->scaleVec.z) });
+        j["Section1"]["UUIDs"].push_back(json::string_t(scene[i]->UUID));
+        j["Section2"][scene[i]->UUID]["TRANSLATION"].push_back({ json::number_float_t(scene[i]->translationVec.x), json::number_float_t(scene[i]->translationVec.y), json::number_float_t(scene[i]->translationVec.z) });
+        j["Section2"][scene[i]->UUID]["ROTATION"].push_back({ json::number_float_t(scene[i]->rotationVec.x), json::number_float_t(scene[i]->rotationVec.y), json::number_float_t(scene[i]->rotationVec.z) });
+        j["Section2"][scene[i]->UUID]["SCALE"].push_back({ json::number_float_t(scene[i]->scaleVec.x), json::number_float_t(scene[i]->scaleVec.y), json::number_float_t(scene[i]->scaleVec.z) });
 
 
     }
+    j["Section3"]["CameraInfo"]["CameraPos"].push_back({ json::number_float_t(camera->Position.x), json::number_float_t(camera->Position.y), json::number_float_t(camera->Position.z) });
+    j["Section3"]["CameraInfo"]["CameraOrientation"].push_back({ json::number_float_t(camera->Orientation.x), json::number_float_t(camera->Orientation.y), json::number_float_t(camera->Orientation.z) });
     j["Section3"]["LightInfo"]["LightPos"].push_back({ json::number_float_t(camera->lightPos.x), json::number_float_t(camera->lightPos.y), json::number_float_t(camera->lightPos.z) });
     j["Section3"]["LightInfo"]["LightColor"].push_back({ json::number_float_t(camera->lightColor.x), json::number_float_t(camera->lightColor.y), json::number_float_t(camera->lightColor.z) });
-
+    
     f << std::setw(4) << j << std::endl;
 }
 
@@ -1923,11 +2124,10 @@ void Engine::loadModel(Model* model) {
     if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, (model->baseDir + model->MODEL_PATH).c_str(), "res/models/")) {
         throw std::runtime_error(err);
     }
-    
-    
+
     std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
-    static const int N = shapes.size();
+    static const int N = static_cast<const int>(shapes.size());
     auto progress = tlog::progress(N);
 
     int prog = 0;
@@ -1970,32 +2170,58 @@ void Engine::loadModel(Model* model) {
     model->material.ambient = glm::vec3(materials[0].ambient[0], materials[0].ambient[1], materials[0].ambient[2]);
     model->material.diffuse = glm::vec3(materials[0].diffuse[0], materials[0].diffuse[1], materials[0].diffuse[2]);
     model->material.specular = glm::vec3(materials[0].specular[0], materials[0].specular[1], materials[0].specular[2]);
-    model->material.shininess = materials[0].shininess;
-    statsVert = model->vertices.size();
+    model->material.shininess = glm::vec3(materials[0].shininess, 0.0f, 0.0f);
+    
+    
+    model->statsFaces = static_cast<int>((model->indices.size()/3));
     printf("\n");
     tlog::none();
     tlog::success();
     printf("Material count: %d \n", static_cast<int>(materials.size()));
 }
 
-void Engine::traceDir(std::string directory)
+void Engine::traceDir(std::string modelDirectory, std::string textureDirectory)
 {
-    struct stat sb;
-
-    for (const auto& entry : std::filesystem::directory_iterator(directory))
+    
+    model_paths.resize(0);
+    texture_paths.resize(0);
+    for (const auto& entry : std::filesystem::directory_iterator(modelDirectory))
     {
         std::filesystem::path outfilename = entry.path();
         if (outfilename.extension() == ".obj")
         {
             std::string outfilename_str = outfilename.string();
 
-
-            //if (stat(path, &sb) == 0 && !(sb.st_mode & S_IFDIR))
-            std::cout << "models/" + clear_slash(outfilename_str) << std::endl;
+            model_paths.push_back(clear_slash(outfilename_str));
         }
-        
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(textureDirectory))
+    {
+        std::filesystem::path outfilename = entry.path();
+        if (outfilename.extension() == ".png" || outfilename.extension() == ".jpg" || outfilename.extension() == "jpeg")
+        {
+            std::string outfilename_str = outfilename.string();
+    
+            texture_paths.push_back(clear_slash(outfilename_str));
+        }
     }
 }
+
+void Engine::traceScenesDir(std::string sceneDirectory)
+{
+    
+    scene_paths.resize(0);
+    for (const auto& entry : std::filesystem::directory_iterator(sceneDirectory))
+    {
+        std::filesystem::path outfilename = entry.path();
+        if (outfilename.extension() == ".json")
+        {
+            std::string outfilename_str = outfilename.string();
+            scene_paths.push_back(clear_slash(outfilename_str));
+        }
+    }
+}
+
 
 VkSampleCountFlagBits Engine::getMaxUsableSampleCount()
 {
@@ -2024,7 +2250,7 @@ void Engine::drawWindowTitle()
         double timeToDraw = 1000.0 / double(nbFrames);
         double fps = double(nbFrames) / delta;
         std::stringstream ss;
-        ss << TITLE << " " << VERSION << " [" << fps << " FPS]" << " [" << timeToDraw << "ms  Frametime ]" << " [ VERTICES COUNT: " << mCurrentSelectedModel->vertices.size() << " ]";
+        ss << TITLE << " " << VERSION << " [" << fps << " FPS]" << " [" << timeToDraw << "ms  Frametime ]" << "[ TRIANGLES COUNT: " << statsFaces << " ]";
 
         glfwSetWindowTitle(window, ss.str().c_str());
 
@@ -2036,9 +2262,10 @@ void Engine::drawWindowTitle()
 
 void Engine::loadScene()
 {
-    std::ifstream f{"res/data/main.json"};
+    scene.resize(0);
+    std::ifstream f{"res/data/" + scene_path};
     json j = json::parse(f);
-    sceneSize = j["Section1"]["ModelPaths"].size();
+    sceneSize = j["Section1"]["UUIDs"].size();
     for (size_t i = 0; i < sceneSize; ++i)
     {
         std::string s1 = j["Section1"]["ModelPaths"][i];
@@ -2046,20 +2273,23 @@ void Engine::loadScene()
         std::string s2 = j["Section1"]["TexturePaths"][i];
         s2.erase(remove(s2.begin(), s2.end(), '\"'), s2.end());
         Model* cModel = new Model(s1.c_str(), s2.c_str());
+        cModel->UUID = j["Section1"]["UUIDs"][i];
         loadModel(cModel);
         addtoScene(cModel);
+        statsFaces += cModel->statsFaces;
     }
 }
 
 void Engine::addtoScene(Model* model)
 {
+    
     scene.push_back(model);
 }
 
 void Engine::cleanUpModel(Model* model)
 {
-    vkDeviceWaitIdle(device);
-
+    //vkDeviceWaitIdle(device);
+    
     for (auto& ubo : model->uniformBuffers)
         vkDestroyBuffer(device, ubo, nullptr);
     for (auto& mem : model->uniformBuffersMemory)

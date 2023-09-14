@@ -1,12 +1,12 @@
 #version 460 core
 #extension GL_EXT_ray_tracing : enable
 
-struct Material // shininess does nothing yet :((
+struct Material 
 {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
-    float shininess;
+    vec3 shininess;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -35,7 +35,7 @@ layout(location = 6) out vec3 alightColor;
 layout(location = 7) out vec3 mambient;
 layout(location = 8) out vec3 mdiffuse;
 layout(location = 9) out vec3 mspecular;
-layout(location = 10) out float mshininess;
+layout(location = 10)out vec3 mshininess;
 
 
 void main() {
@@ -47,6 +47,7 @@ void main() {
     fragPos = vec3(ubo.transform * vec4(inPosition, 1.0));
     aCameraPos = ubo.cameraPos;
     fragTexCoord = inTexCoord;
+    
 
     mambient = ubo.material.ambient;
     mdiffuse = ubo.material.diffuse;

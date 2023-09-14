@@ -63,7 +63,16 @@
     <ClCompile Include="src\Model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="include\JSONParser.cpp">
+    <ClCompile Include="src\JSONParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_stdlib.cpp">
+      <Filter>Source Files\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Entity.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ThreadManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -125,6 +134,18 @@
     <ClInclude Include="include\JSONParser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="imgui\imgui_stdlib.h">
+      <Filter>Header Files\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Entity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ThreadManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\BasicCollider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaderSrc\shader.frag">
@@ -136,19 +157,8 @@
     <None Include="notes.md">
       <Filter>Resource Files</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="x64\Debug\res\textures\real.jpg">
-      <Filter>Resource Files\textures</Filter>
-    </Image>
-    <Image Include="x64\Debug\res\textures\roman.jpg">
-      <Filter>Resource Files\textures</Filter>
-    </Image>
-    <Image Include="x64\Debug\res\textures\kaley.jpg">
-      <Filter>Resource Files\textures</Filter>
-    </Image>
-    <Image Include="x64\Debug\res\textures\anime1.jpg">
+    <None Include="res\main.json">
       <Filter>Resource Files</Filter>
-    </Image>
+    </None>
   </ItemGroup>
 </Project>
