@@ -118,7 +118,7 @@ bool DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm:
 	return true;
 }
 
-
+// https://stackoverflow.com/questions/9543715/generating-human-readable-usable-short-but-unique-ids
 void GenerateUUID(Model* model, int length ,bool useBase62)
 {
 	const char* baseChars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";

@@ -68,6 +68,7 @@ private:
     std::vector<std::string> model_paths;
     std::vector<std::string> texture_paths;
     std::vector<std::string> scene_paths;
+    std::string RendererName;
     bool addModel = false;
     bool editScene = false;
     bool firstScene = true;
@@ -85,7 +86,9 @@ private:
     bool LockImGui = false;
     bool lightTranslateEnable = false;
     bool shouldDestroy = false;
+    bool shouldResetScene = false;
     bool shouldUpdatePipeline = true;
+    int pipelineIndex = 0;
     float FOV = 90.0f;
     float RotDegrees;
     double lastTime = 0.0;
@@ -111,9 +114,15 @@ private:
     VkSurfaceKHR surface;
     VkSwapchainKHR swapChain;
     VkDescriptorSetLayout descriptorSetLayout;
-    VkPipelineLayout pipelineLayout;
+
+    int currentPipeline = 0;
+    bool lockPipeline = true;
     VkRenderPass renderPass;
-    VkPipeline graphicsPipeline;
+    //VkPipeline graphicsPipeline;
+    std::vector<VkPipeline> graphicsPipelines;
+    std::vector<VkPipelineLayout> pipelineLayouts;
+    //VkPipelineLayout pipelineLayout;
+    
     VkCommandPool commandPool;
     VkDescriptorPool descriptorPool;
     VkImage depthImage;
@@ -122,7 +131,7 @@ private:
     VkImage colorImage;
     VkDeviceMemory colorImageMemory;
     VkImageView colorImageView;
-    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+    VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;  
     VkDescriptorPool imGuiDP;
     std::vector<VkCommandBuffer> commandBuffers;
     std::vector<VkImage> swapChainImages;
@@ -179,7 +188,8 @@ private:
     void createSwapChain();
     void createImageViews();
     void createRenderPass();
-    void createGraphicsPipeline();
+    void createGraphicsPipeline(int index, std::string vertShaderPath, std::string fragShaderPath);
+    void createGraphicsPipelineWrapper(std::string vertShaderPath, std::string fragShaderPath);
     void createFramebuffers();
     void createCommandPool();
     void createCommandBuffers();
@@ -206,6 +216,7 @@ private:
     void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
     void renderImGui();
     void loadScene();
+    void resetScene();
     void addtoScene(Model* model);
     void traceDir(std::string modelDirectory, std::string textureDirectory);
     bool isDeviceSuitable(VkPhysicalDevice device);

@@ -31,12 +31,7 @@ layout(location = 3) out vec3 fragPos;
 layout(location = 4) out vec3 lightPos;
 layout(location = 5) out vec3 aCameraPos;
 layout(location = 6) out vec3 alightColor;
-
-layout(location = 7) out vec3 mambient;
-layout(location = 8) out vec3 mdiffuse;
-layout(location = 9) out vec3 mspecular;
-layout(location = 10)out vec3 mshininess;
-
+layout(location = 7) out Material mMaterial;
 
 void main() {
     gl_Position = ubo.proj * ubo.view * ubo.transform * vec4(inPosition, 1.0);
@@ -48,10 +43,7 @@ void main() {
     aCameraPos = ubo.cameraPos;
     fragTexCoord = inTexCoord;
     
-
-    mambient = ubo.material.ambient;
-    mdiffuse = ubo.material.diffuse;
-    mspecular = ubo.material.specular;
-    mshininess = ubo.material.shininess;
+    mMaterial = ubo.material;
+    
 
 }

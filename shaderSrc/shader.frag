@@ -19,6 +19,14 @@ layout(location = 10) in vec3 mshininess;
 
 layout(location = 0) out vec4 outColor;
 
+float LinearizeDepth(float depth) 
+{
+    float z = depth * 2.0 - 1.0; // back to NDC 
+    return (2.0 * 0.1f * 100.0f) / (100.0f + 0.1f - z * (100.0f - 0.1f));	
+}
+
+
+
 void main() {
 
     // ambient
@@ -45,7 +53,9 @@ void main() {
     vec3 result = (ambient + diffuse + specular) * fragColor;
     float gamma = 2.2f;
     result = pow(result, vec3(1.0f/gamma));
+
+    float depth = LinearizeDepth(gl_FragCoord.z) / 100.0f;
     outColor = texture(texSampler, fragTexCoord) * vec4(result, 1.0f);
     
-    //outColor = vec4(fragColor * texture(texSampler, fragTexCoord).rgb, 1.0);
+
 }

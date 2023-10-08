@@ -1,2 +1,2 @@
-F:\VulkanSDK\1.3.250.0\Bin\glslc.exe --target-env=vulkan1.2 --target-spv=spv1.5 F:\VulkanProject\VulkanProj\VulkanProject\shaderSrc\shader.vert -o F:\VulkanProject\VulkanProj\VulkanProject\x64\Debug\shaders\vert.spv
-F:\VulkanSDK\1.3.250.0\Bin\glslc.exe --target-env=vulkan1.2 --target-spv=spv1.5 F:\VulkanProject\VulkanProj\VulkanProject\shaderSrc\shader.frag -o F:\VulkanProject\VulkanProj\VulkanProject\x64\Debug\shaders\frag.spv
+F:\VulkanSDK\1.3.250.0\Bin\glslc.exe --target-env=vulkan1.2 --target-spv=spv1.5 F:\VulkanProject\VulkanProj\VulkanProject\shaderSrc\shader.vert -o F:\VulkanProject\VulkanProj\VulkanProject\x64\Release\res\shaders\vert.spv
+F:\VulkanSDK\1.3.250.0\Bin\glslc.exe --target-env=vulkan1.2 --target-spv=spv1.5 F:\VulkanProject\VulkanProj\VulkanProject\shaderSrc\shader.frag -o F:\VulkanProject\VulkanProj\VulkanProject\x64\Release\res\shaders\frag.spv

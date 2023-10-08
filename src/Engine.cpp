@@ -102,7 +102,10 @@ void Engine::initVulkan()
     createImageViews();
     createRenderPass();
     createDescriptorSetLayout();
-    createGraphicsPipeline();
+    
+    
+    createGraphicsPipelineWrapper("res/shaders/vert.spv", "res/shaders/frag.spv");
+    createGraphicsPipelineWrapper("res/shaders/vert.spv", "res/shaders/depth.spv");
     createCommandPool();
     createColorResources();
     createDepthResources();
@@ -139,6 +142,7 @@ void Engine::initImGui()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     io = ImGui::GetIO(); (void)io;
+    io.Fonts->AddFontFromFileTTF("res/fonts/OpenSans-Regular.ttf", 18.0f);
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;   // Disable the fucking mouse
     
@@ -303,6 +307,7 @@ void Engine::pickPhysicalDevice()
         }
         //printf("%s with score: %d\n", &deviceProperties.deviceName, score);
         std::stringstream ss;
+        
         ss << deviceProperties.deviceName << " with score: " << score;
 
         tlog::info(ss.str());
@@ -323,6 +328,7 @@ void Engine::pickPhysicalDevice()
     
     //printf("Card: %s selected with score: %d\n", &deviceProperties.deviceName, candidates.rbegin()->first);
     std::stringstream ss;
+    RendererName = std::string(deviceProperties.deviceName);
     ss << "Card: " << deviceProperties.deviceName << " selected with score: " << candidates.rbegin()->first;
     tlog::none();
     tlog::info(ss.str());
@@ -715,9 +721,17 @@ void Engine::createRenderPass()
     }
 }
 
-void Engine::createGraphicsPipeline(){
-    auto vertShaderCode = readFile("shaders/vert.spv");
-    auto fragShaderCode = readFile("shaders/frag.spv");
+void Engine::createGraphicsPipelineWrapper(std::string vertShaderPath, std::string fragShaderPath)
+{
+    createGraphicsPipeline(graphicsPipelines.size(), vertShaderPath, fragShaderPath);
+}
+
+void Engine::createGraphicsPipeline(int index,std::string vertShaderPath, std::string fragShaderPath){
+    //auto vertShaderCode = readFile("res/shaders/vert.spv");
+    auto vertShaderCode = readFile(vertShaderPath);
+    //auto fragShaderCode = readFile("res/shaders/frag.spv");
+    auto fragShaderCode = readFile(fragShaderPath);
+
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -763,7 +777,7 @@ void Engine::createGraphicsPipeline(){
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE;//VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT; //VK_CULL_MODE_NONE; used to do this cause i am lazy but VK_CULL_MODE_BACK_BIT IS MORE EFFICIENT
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -809,7 +823,10 @@ void Engine::createGraphicsPipeline(){
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
-    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+    pipelineLayouts.resize(pipelineLayouts.size() + 1);
+    pipelineLayouts[index] = VkPipelineLayout();
+
+    if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayouts[index]) != VK_SUCCESS) {
         throw std::runtime_error("ERROR: failed to create pipeline layout!");
     }
 
@@ -825,12 +842,15 @@ void Engine::createGraphicsPipeline(){
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.layout = pipelineLayout;
+    pipelineInfo.layout = pipelineLayouts[index];
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+    graphicsPipelines.resize(graphicsPipelines.size() + 1);
+    graphicsPipelines[index] = VkPipeline();
+
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipelines[index]) != VK_SUCCESS) {
         throw std::runtime_error("ERROR: failed to create graphics pipeline!");
     }
 
@@ -917,7 +937,8 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[currentPipeline]);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -941,7 +962,7 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
 
         vkCmdBindIndexBuffer(commandBuffer, scene[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &scene[i]->descriptorSets[currentFrame], 0, nullptr);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts[currentPipeline], 0, 1, &scene[i]->descriptorSets[currentFrame], 0, nullptr);
 
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(scene[i]->indices.size()), 1, 0, 0, 0);
     }
@@ -992,268 +1013,286 @@ void Engine::renderImGui()
 {
     static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
     static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
+    static bool isComponentsSelected = true;
     ImGui::NewFrame();
 
-    
-    ImGui::Begin("Components", 0, ImGuiWindowFlags_NoMove);
-    ImGui::Text("CURRENT SELECTED MODEL");
-
-    uint8_t count = 0;
-    for (size_t i = 0; i < scene.size(); ++i)
+    //ImGui::SetNextWindowPos(ImVec2(swapChainExtent.width - 735 , 0));
+    if (isComponentsSelected) ImGui::SetNextWindowSize(ImVec2(427, swapChainExtent.height));
+    else ImGui::SetNextWindowSize(ImVec2(600, swapChainExtent.height));
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::Begin("Main", 0, ImGuiWindowFlags_NoMove);
+    ImGui::BeginTabBar("##TabBar");
+    if (ImGui::BeginTabItem("Components"))
     {
-        count++;
-        if (ImGui::RadioButton(std::to_string(i).c_str(), mCurrentSelectedModel == scene[i]))
-            mCurrentSelectedModel = scene[i];
-        if (count % 3 == 0)
-        {
-            count = 0;
-            ImGui::Spacing();
-            continue; 
-        }
-        
-        ImGui::SameLine();
-    }
-    if (ImGui::Checkbox("LightTranslate", &lightTranslateEnable) && lightTranslateEnable)
-    {
-        mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-    }
-    
-    ImGui::InputText("UUID", &mCurrentSelectedModel->UUID);
-    if (ImGui::Button("Generate UUID"))
-    {
-        GenerateUUID(mCurrentSelectedModel, 8, true);
-    }
-    ImGui::Checkbox("EditScene", &editScene);
-    if (editScene)
-    {
-        ImGui::InputText("SceneName", &scene_name);
-        if (ImGui::Button("Refresh"))
-        {
-            traceScenesDir("res/data/");
-        }
-        if (ImGui::BeginListBox("Scenes", ImVec2(200, 100))) {
-            static size_t item_current_idx = 0;
-            for (size_t i = 0; i < scene_paths.size(); ++i)
-            {
-                const bool isSelected = (item_current_idx == i);
-                if (ImGui::Selectable(scene_paths[i].c_str(), isSelected))
-                {
-                    item_current_idx = i;
-                    scene_path = scene_paths[i];
-                }
-                if (isSelected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndListBox();
-        }
-        if (ImGui::Button("LoadScene") && false) // using && to disable it // it is currently junky and unstable
-        {
-            vkDeviceWaitIdle(device);
-            cleanup();
-            firstScene = false;
-            run();
-            
-        }
-        if (ImGui::Button("SaveToSelected"))
-        {
-            writeToFile(scene);
-        } ImGui::SameLine();
-        if (ImGui::Button("SaveToInput"))
-        {
-            scene_path = scene_name;
-            writeToFile(scene);
-        }
-    }
-    
-    if (ImGui::Button("Update Graphics Pipeline"))
-    {
-        shouldUpdatePipeline = true;
-    }
-    
-    ImGui::SliderFloat("FOV", &FOV, 10.0f, 120.0f, NULL);
-    ImGui::SliderFloat3("ModelPos", glm::value_ptr(mCurrentSelectedModel->translationVec), -5.0f, 5.0f, NULL);
-    ImGui::SliderFloat3("ModelRot", glm::value_ptr(mCurrentSelectedModel->rotationVec), 0.0f, 6.28f, NULL);
-    ImGui::SliderFloat3("ModelScale", glm::value_ptr(mCurrentSelectedModel->scaleVec), 0.001f, 10.0f, NULL);
-    ImGui::SliderFloat3("LightPos", glm::value_ptr(camera->lightPos), -5.0f, 5.0f, NULL);
-    
-    
+        isComponentsSelected = true;
+        ImGui::Text("Renderer: %s", RendererName.c_str());
 
-    ImGui::Text("CURRENT GIZMO OPERATION:");
-    if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
-        mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Rotation", mCurrentGizmoOperation == ImGuizmo::ROTATE))
-        mCurrentGizmoOperation = ImGuizmo::ROTATE;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
-        mCurrentGizmoOperation = ImGuizmo::SCALE;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
-        mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
-    
+        ImGui::Text("CURRENT SELECTED MODEL");
 
-
-    //ImGuiColorEditFlags_PickerHueWheel
-    ImGui::ColorPicker3("lightColor", glm::value_ptr(camera->lightColor), ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_NoAlpha);
-    ImGui::Text("Selected Model Material");
-    ImGui::SliderFloat3("Ambient", glm::value_ptr(mCurrentSelectedModel->material.ambient), 0.0f, 10.0f, NULL);
-    ImGui::SliderFloat3("Diffuse", glm::value_ptr(mCurrentSelectedModel->material.diffuse), 0.0f, 10.0f, NULL);
-    ImGui::SliderFloat3("Specular", glm::value_ptr(mCurrentSelectedModel->material.specular), 0.0f, 10.0f, NULL);
-    ImGui::SliderFloat("Shininess", &mCurrentSelectedModel->material.shininess.r, 0.1f, 360.0f, NULL, ImGuiSliderFlags_Logarithmic);
-    
-    
-    ImGui::InputText("Model", &model_path);
-    ImGui::InputText("Texture", &texture_path);
-    if (ImGui::Button("Add Model"))
-    {
-        Model* cModel = nullptr;
-        try {
-            cModel = new Model("models/" + model_path, "textures/" + texture_path);
-            GenerateUUID(cModel, 8, true);
-            loadModel(cModel);
-            createTextureImage(cModel);
-            createTextureImageView(cModel);
-            createTextureSampler(cModel);
-            createVertexBuffer(cModel);
-            createIndexBuffer(cModel);
-            createUniformBuffers(cModel);
-            createDescriptorPool(cModel);
-            createDescriptorSets(cModel);
-            addtoScene(cModel);
-            statsFaces += cModel->statsFaces;
-        }
-        catch(const std::exception& e){
-            delete cModel;
-            std::cerr << e.what() << std::endl;
-            
-        }
-    }
-    if (ImGui::Button("Delete Selected Model"))
-    {
-        std::vector<Model*> newScene;
-        for (size_t i = 0; i < scene.size(); i++)
-        {
-            if (strcmp(scene[i]->UUID.c_str(), mCurrentSelectedModel->UUID.c_str()))
-            {
-                newScene.push_back(scene[i]);
-            }
-    
-        }
-        shouldDestroy = true;
-        
-        scene.resize(0);
-        for (size_t i = 0 ; i < newScene.size(); i++)
-        {
-            scene.push_back(newScene[i]);
-        }
-        statsFaces -= mCurrentSelectedModel->statsFaces;
-    }
-     
-    ImGui::Checkbox("AddModel", &addModel);
-    if (addModel)
-    {
-        if (ImGui::Button("Refresh"))
-        {
-            traceDir("res/models/", "res/textures/");
-        }
-        if (ImGui::BeginListBox("Models", ImVec2(200, 100))) {
-            static size_t item_current_idx = 0;
-            for (size_t i = 0; i < model_paths.size(); ++i)
-            {
-                const bool isSelected = (item_current_idx == i);
-                if (ImGui::Selectable(model_paths[i].c_str(), isSelected))
-                {
-                    item_current_idx = i;
-                    model_path = model_paths[i];
-                }
-                if (isSelected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndListBox();
-        }
-
-        if (ImGui::BeginListBox("Textures", ImVec2(200, 100))) {
-            static size_t item_current_idx2 = 0;
-            for (size_t i = 0; i < texture_paths.size(); ++i)
-            {
-                const bool isSelected = (item_current_idx2 == i);
-                if (ImGui::Selectable(texture_paths[i].c_str(), isSelected))
-                {
-                    item_current_idx2 = i;
-                    texture_path = texture_paths[i];
-                }
-                if (isSelected)
-                    ImGui::SetItemDefaultFocus();
-            }
-
-            ImGui::EndListBox();
-        }
-
-    }
-    
-    
-    
-    ImGui::End();
-
-    ImGui::SetNextWindowPos(ImVec2(swapChainExtent.width - 735 , 0));
-    ImGui::Begin("Scene", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-    
-    if (ImGui::BeginTable("CameraPos", 4))
-    {
-        ImGui::TableSetupColumn("POS");
-        ImGui::TableSetupColumn("X");
-        ImGui::TableSetupColumn("Y");
-        ImGui::TableSetupColumn("Z");
-        ImGui::TableHeadersRow();
-        
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::Text("Camera Position");
-        ImGui::TableNextColumn();
-        ImGui::Text("%.5f", camera->Position.x);
-        ImGui::TableNextColumn();
-        ImGui::Text("%.5f", camera->Position.y);
-        ImGui::TableNextColumn();
-        ImGui::Text("%.5f", camera->Position.z);
-        
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::Text("Orientation");
-        ImGui::TableNextColumn();
-        ImGui::Text("%.5f", camera->Orientation.x);
-        ImGui::TableNextColumn();
-        ImGui::Text("%.5f", camera->Orientation.y);
-        ImGui::TableNextColumn();
-        ImGui::Text("%.5f", camera->Orientation.z);
-        ImGui::EndTable();
-        
-    }
-
-    if (ImGui::BeginTable("Scene Details", 3))
-    {
-        ImGui::TableSetupColumn("MODEL");
-        ImGui::TableSetupColumn("ID");
-        ImGui::TableSetupColumn("TRIANGLES");
-        
-        ImGui::TableHeadersRow();
-
+        uint8_t count = 0;
         for (size_t i = 0; i < scene.size(); ++i)
         {
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::Text(scene[i]->MODEL_PATH.c_str());
-            ImGui::TableNextColumn();
-            ImGui::Text(scene[i]->UUID.c_str());
-            ImGui::TableNextColumn();
-            ImGui::Text("%d", scene[i]->statsFaces);
-            
+            count++;
+            if (ImGui::RadioButton(std::to_string(i).c_str(), mCurrentSelectedModel == scene[i]))
+                mCurrentSelectedModel = scene[i];
+            if (count % 3 == 0)
+            {
+                count = 0;
+                ImGui::Spacing();
+                continue;
+            }
+
+            ImGui::SameLine();
         }
-        ImGui::EndTable();
+        if (ImGui::Checkbox("LightTranslate", &lightTranslateEnable) && lightTranslateEnable)
+        {
+            mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+        }
+
+        
+        
+
+        ImGui::Checkbox("EditScene", &editScene);
+        if (editScene)
+        {
+            ImGui::InputText("SceneName", &scene_name);
+            if (ImGui::Button("Refresh"))
+            {
+                traceScenesDir("res/data/");
+            }
+            if (ImGui::BeginListBox("Scenes", ImVec2(200, 100))) {
+                static size_t item_current_idx = 0;
+                for (size_t i = 0; i < scene_paths.size(); ++i)
+                {
+                    const bool isSelected = (item_current_idx == i);
+                    if (ImGui::Selectable(scene_paths[i].c_str(), isSelected))
+                    {
+                        item_current_idx = i;
+                        scene_path = scene_paths[i];
+                    }
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndListBox();
+            }
+            if (ImGui::Button("LoadScene"))
+            {
+                resetScene();
+            }
+            if (ImGui::Button("SaveToSelected"))
+            {
+                writeToFile(scene);
+            } ImGui::SameLine();
+            if (ImGui::Button("SaveToInput"))
+            {
+                scene_path = scene_name;
+                writeToFile(scene);
+            }
+        }
+
+        if (ImGui::Button("Update Graphics Pipeline"))
+        {
+            shouldUpdatePipeline = true;
+        }
+
+        if(mCurrentSelectedModel)
+        {
+            ImGui::InputText("UUID", &mCurrentSelectedModel->UUID);
+            if (ImGui::Button("Generate UUID"))
+            {
+                GenerateUUID(mCurrentSelectedModel, 8, true);
+            }
+            ImGui::SliderFloat("FOV", &FOV, 10.0f, 120.0f, NULL);
+            ImGui::SliderFloat3("ModelPos", glm::value_ptr(mCurrentSelectedModel->translationVec), -5.0f, 5.0f, NULL);
+            ImGui::SliderFloat3("ModelRot", glm::value_ptr(mCurrentSelectedModel->rotationVec), 0.0f, 6.28f, NULL);
+            ImGui::SliderFloat3("ModelScale", glm::value_ptr(mCurrentSelectedModel->scaleVec), 0.001f, 10.0f, NULL);
+            ImGui::SliderFloat3("LightPos", glm::value_ptr(camera->lightPos), -5.0f, 5.0f, NULL);
+
+
+
+            ImGui::Text("CURRENT GIZMO OPERATION:");
+            if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+                mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Rotation", mCurrentGizmoOperation == ImGuizmo::ROTATE))
+                mCurrentGizmoOperation = ImGuizmo::ROTATE;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
+                mCurrentGizmoOperation = ImGuizmo::SCALE;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
+                mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+            ImGui::Text("GuizmoMode");
+            if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
+                mCurrentGizmoMode = ImGuizmo::LOCAL;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
+                mCurrentGizmoMode = ImGuizmo::WORLD;
+
+
+            //ImGuiColorEditFlags_PickerHueWheel
+            ImGui::ColorPicker3("lightColor", glm::value_ptr(camera->lightColor), ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_NoAlpha);
+            ImGui::Text("Selected Model Material");
+            ImGui::SliderFloat3("Ambient", glm::value_ptr(mCurrentSelectedModel->material.ambient), 0.0f, 10.0f, NULL);
+            ImGui::SliderFloat3("Diffuse", glm::value_ptr(mCurrentSelectedModel->material.diffuse), 0.0f, 10.0f, NULL);
+            ImGui::SliderFloat3("Specular", glm::value_ptr(mCurrentSelectedModel->material.specular), 0.0f, 10.0f, NULL);
+            ImGui::SliderFloat("Shininess", &mCurrentSelectedModel->material.shininess.r, 0.1f, 360.0f, NULL, ImGuiSliderFlags_Logarithmic);
+
+        }
+
+        ImGui::InputText("Model", &model_path);
+        ImGui::InputText("Texture", &texture_path);
+        if (ImGui::Button("Add Model"))
+        {
+            Model* cModel = nullptr;
+            try {
+                cModel = new Model("models/" + model_path, "textures/" + texture_path);
+                GenerateUUID(cModel, 8, true);
+                loadModel(cModel);
+                createTextureImage(cModel);
+                createTextureImageView(cModel);
+                createTextureSampler(cModel);
+                createVertexBuffer(cModel);
+                createIndexBuffer(cModel);
+                createUniformBuffers(cModel);
+                createDescriptorPool(cModel);
+                createDescriptorSets(cModel);
+                addtoScene(cModel);
+                statsFaces += cModel->statsFaces;
+            }
+            catch (const std::exception& e) {
+                delete cModel;
+                std::cerr << e.what() << std::endl;
+
+            }
+        }
+        if (ImGui::Button("Delete Selected Model"))
+        {
+            std::vector<Model*> newScene;
+            for (size_t i = 0; i < scene.size(); i++)
+            {
+                if (strcmp(scene[i]->UUID.c_str(), mCurrentSelectedModel->UUID.c_str()))
+                {
+                    newScene.push_back(scene[i]);
+                }
+
+            }
+            shouldDestroy = true;
+
+            scene.resize(0);
+            for (size_t i = 0; i < newScene.size(); i++)
+            {
+                scene.push_back(newScene[i]);
+            }
+            statsFaces -= mCurrentSelectedModel->statsFaces;
+        }
+
+        ImGui::Checkbox("AddModel", &addModel);
+        if (addModel)
+        {
+            if (ImGui::Button("Refresh"))
+            {
+                traceDir("res/models/", "res/textures/");
+            }
+            if (ImGui::BeginListBox("Models", ImVec2(200, 100))) {
+                static size_t item_current_idx = 0;
+                for (size_t i = 0; i < model_paths.size(); ++i)
+                {
+                    const bool isSelected = (item_current_idx == i);
+                    if (ImGui::Selectable(model_paths[i].c_str(), isSelected))
+                    {
+                        item_current_idx = i;
+                        model_path = model_paths[i];
+                    }
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndListBox();
+            }
+
+            if (ImGui::BeginListBox("Textures", ImVec2(200, 100))) {
+                static size_t item_current_idx2 = 0;
+                for (size_t i = 0; i < texture_paths.size(); ++i)
+                {
+                    const bool isSelected = (item_current_idx2 == i);
+                    if (ImGui::Selectable(texture_paths[i].c_str(), isSelected))
+                    {
+                        item_current_idx2 = i;
+                        texture_path = texture_paths[i];
+                    }
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndListBox();
+            }
+
+        }
+
+        ImGui::EndTabItem();
     }
 
-    
-    
+    if (ImGui::BeginTabItem("Scene"))
+    {
+        isComponentsSelected = false;
+        if (ImGui::BeginTable("CameraPos", 4))
+        {
+            ImGui::TableSetupColumn("POS");
+            ImGui::TableSetupColumn("X");
+            ImGui::TableSetupColumn("Y");
+            ImGui::TableSetupColumn("Z");
+            ImGui::TableHeadersRow();
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::Text("Camera Position");
+            ImGui::TableNextColumn();
+            ImGui::Text("%.5f", camera->Position.x);
+            ImGui::TableNextColumn();
+            ImGui::Text("%.5f", camera->Position.y);
+            ImGui::TableNextColumn();
+            ImGui::Text("%.5f", camera->Position.z);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::Text("Orientation");
+            ImGui::TableNextColumn();
+            ImGui::Text("%.5f", camera->Orientation.x);
+            ImGui::TableNextColumn();
+            ImGui::Text("%.5f", camera->Orientation.y);
+            ImGui::TableNextColumn();
+            ImGui::Text("%.5f", camera->Orientation.z);
+            ImGui::EndTable();
+
+        }
+
+
+        if (ImGui::BeginTable("Scene Details", 3))
+        {
+            ImGui::TableSetupColumn("MODEL");
+            ImGui::TableSetupColumn("ID");
+            ImGui::TableSetupColumn("TRIANGLES");
+
+            ImGui::TableHeadersRow();
+
+            for (size_t i = 0; i < scene.size(); ++i)
+            {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text(scene[i]->MODEL_PATH.c_str());
+                ImGui::TableNextColumn();
+                ImGui::Text(scene[i]->UUID.c_str());
+                ImGui::TableNextColumn();
+                ImGui::Text("%d", scene[i]->statsFaces);
+
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndTabItem();
+    }
+    ImGui::EndTabBar();
     ImGui::End();
+    
     if (true)
     {
         
@@ -1273,13 +1312,19 @@ void Engine::renderImGui()
         {
             mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
         }
-        //if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS)
-        //{
-        //    mCurrentSelectedModel = nullptr;
-        //}
+        if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && lockPipeline) // shity lock mechanic
+        {
+            lockPipeline = false;
+            currentPipeline = !currentPipeline;
+            printf("\r%d", currentPipeline);
+        }
+        if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE)
+        {
+            lockPipeline = true;
+        }
+        
         if (false && glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS ) // this is the worst code i have ever written // currently doesn't work
         {
-            
             for (size_t i = 0; i < scene.size(); ++i)
             {
                 scene[i]->collider.center = scene[i]->translationVec;
@@ -1299,7 +1344,7 @@ void Engine::renderImGui()
             }
         }
         
-        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetOrthographic(true);
         ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
         ImGuizmo::SetRect(0, 0, swapChainExtent.width, swapChainExtent.height);
@@ -1316,7 +1361,7 @@ void Engine::renderImGui()
                 mCurrentSelectedModel->scaleVec = scale;
             }
         }
-        else {
+        else if (mCurrentSelectedModel != nullptr){
             ImGuizmo::Manipulate(glm::value_ptr(camera->view), glm::value_ptr(camera->proj), mCurrentGizmoOperation, mCurrentGizmoMode, glm::value_ptr(camera->lightMat));
 
             if (ImGuizmo::IsUsing())
@@ -1364,12 +1409,48 @@ void Engine::drawFrame()
         cleanUpModel(mCurrentSelectedModel);
         mCurrentSelectedModel = scene.back();
     }
+    if (shouldResetScene && scene.size())
+    {
+        vkQueueWaitIdle(graphicsQueue);
+        for (auto& cModel : scene)
+        {
+            cleanUpModel(cModel);
+            //statsFaces -= cModel->statsFaces;
+        }
+        mCurrentSelectedModel = nullptr;
+        scene.resize(0);
+        shouldResetScene = false;
+
+        loadScene();
+        loadFile(scene_path);
+        for (size_t i = 0; i < sceneSize; ++i)
+        {
+            createTextureImage(scene[i]);
+            createTextureImageView(scene[i]);
+            createTextureSampler(scene[i]);
+            createVertexBuffer(scene[i]);
+            createIndexBuffer(scene[i]);
+            createUniformBuffers(scene[i]);
+            createDescriptorPool(scene[i]);
+            createDescriptorSets(scene[i]);
+        }
+    }
     if (shouldUpdatePipeline)
     {
         vkQueueWaitIdle(graphicsQueue);
-        vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        createGraphicsPipeline();
+        for (auto& pipeline : graphicsPipelines)
+        {
+            vkDestroyPipeline(device, pipeline, nullptr);
+        }
+        for (auto& pipelineLayout : pipelineLayouts)
+        {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        }
+        graphicsPipelines.resize(0); // reset sizes
+        pipelineLayouts.resize(0); 
+        createGraphicsPipelineWrapper("res/shaders/vert.spv", "res/shaders/frag.spv");
+        createGraphicsPipelineWrapper("res/shaders/vert.spv", "res/shaders/depth.spv");
+
         shouldUpdatePipeline = false;
     }
     
@@ -1387,11 +1468,14 @@ void Engine::drawFrame()
     }
 
     
-
-    for (size_t i = 0; i < scene.size(); i++)
+    if (scene.size())
     {
-        updateUniformBuffers(currentFrame, scene[i]);
+        for (size_t i = 0; i < scene.size(); i++)
+        {
+            updateUniformBuffers(currentFrame, scene[i]);
+        }
     }
+    
 
     
     
@@ -2152,6 +2236,8 @@ void Engine::loadModel(Model* model) {
                 1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
             };
 
+            
+
             vertex.color = { 1.0f, 1.0f, 1.0f };
 
             if (uniqueVertices.count(vertex) == 0) {
@@ -2280,6 +2366,13 @@ void Engine::loadScene()
     }
 }
 
+void Engine::resetScene()
+{
+    
+    shouldResetScene = true;
+    
+}
+
 void Engine::addtoScene(Model* model)
 {
     
@@ -2288,7 +2381,6 @@ void Engine::addtoScene(Model* model)
 
 void Engine::cleanUpModel(Model* model)
 {
-    //vkDeviceWaitIdle(device);
     
     for (auto& ubo : model->uniformBuffers)
         vkDestroyBuffer(device, ubo, nullptr);
@@ -2341,9 +2433,14 @@ void Engine::cleanup()
         free(scene[i]);
     }
     
-    vkDestroyPipeline(device, graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-
+    for (auto& pipeline : graphicsPipelines)
+    {
+        vkDestroyPipeline(device, pipeline, nullptr);
+    }
+    for (auto& pipelineLayout : pipelineLayouts)
+    {
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    }
     vkDestroyRenderPass(device, renderPass, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
