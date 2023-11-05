@@ -21,11 +21,52 @@ void Camera::UpdateMatrices(float FOV, Model* Model)
 	model *= translateMat * rotMat * scaleMat;
 	Model->transform = model;
 	lightMat = glm::translate(lightPos);
-	view = glm::lookAt(Position, Position + Orientation, Up); // world space
-	proj = glm::perspective(glm::radians(FOV), width / (float)height, 0.1f, 10000.0f); // no idea
-	
+	view = glm::lookAt(Position, Position + Orientation, Up); 
+	proj = glm::perspective(glm::radians(FOV), width / (float)height, 0.1f, 10000.0f);
+
 }
 
+
+int Camera::pickModel(std::vector<Model*> scene, GLFWwindow* window)
+{
+	
+	for (int i = 0; i < scene.size(); ++i)
+	{
+		glm::vec4 clipSpacePos = proj * (view * glm::vec4(scene[i]->translationVec, 1.0));
+		glm::vec3 ndcSpacePos;
+		if (!clipSpacePos.w)
+			printf("Panik!");
+		ndcSpacePos.x = clipSpacePos.x / clipSpacePos.w;
+		ndcSpacePos.y = clipSpacePos.y / clipSpacePos.w;
+		ndcSpacePos.z = clipSpacePos.z / clipSpacePos.w;
+		//printf("\rclipSpacePos.x %.3f,clipSpacePos.y: %.3f,clipSpacePos.z: %.3f", clipSpacePos.x, clipSpacePos.y, clipSpacePos.z);
+		glm::vec2 windowSpacePos;
+		windowSpacePos.x = ((ndcSpacePos.x + 1.0) / 2.0); //* viewSize + viewOffset;
+		windowSpacePos.y = ((ndcSpacePos.y + 1.0) / 2.0);
+		
+		double xClick, yClick;
+		glfwGetCursorPos(window, &xClick, &yClick);
+		yClick = height - yClick;
+		float nonNormalizedValueX = windowSpacePos.x * (width);
+		float nonNormalizedValueY = windowSpacePos.y * height;
+		
+		//printf("nonNormalizedValueX: %f\n", nonNormalizedValueX);
+		//printf("nonNormalizedValueY: %f\n", nonNormalizedValueY);
+		//printf("xClick: %f yClick: %f\n", xClick, yClick);
+		
+		if (xClick > nonNormalizedValueX - 50.0 && xClick < nonNormalizedValueX + 50.0)
+		{
+			
+			if (yClick > nonNormalizedValueY - 50.0 && yClick < nonNormalizedValueY + 50.0)
+			{
+				
+				return i;
+			}
+		}
+		
+	}
+	return -1;
+}
 
 void Camera::UpdateInputs(GLFWwindow* window)
 {

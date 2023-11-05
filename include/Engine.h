@@ -21,6 +21,7 @@
 #include <json.hpp>
 #include <Model.h>
 #include <Camera.h>
+#include <util.inl>
 #include <iostream>
 #include <filesystem>
 #include <sys/stat.h>
@@ -38,7 +39,6 @@
 #include <algorithm>
 #include <cstdlib>
 
-
 using json = nlohmann::ordered_json;
 
 
@@ -54,6 +54,7 @@ struct UniformBufferObject
 };
 
 
+
 class Engine {
 
 public:
@@ -62,7 +63,8 @@ public:
     void run();
     bool framebufferResized = false;
     bool enableimGUI = true;
-
+    
+    
 private:
     uint32_t WIDTH, HEIGHT = 0;
     std::vector<std::string> model_paths;
@@ -88,6 +90,8 @@ private:
     bool shouldDestroy = false;
     bool shouldResetScene = false;
     bool shouldUpdatePipeline = true;
+    bool newScene = false;
+    
     int pipelineIndex = 0;
     float FOV = 90.0f;
     float RotDegrees;
@@ -96,8 +100,7 @@ private:
     uint32_t statsFaces = 0;
     int nbFrames = 0;
 
-    std::vector<std::thread*> workers;
-    std::mutex mutex;
+    
     
     size_t sceneSize;
     Model* mCurrentSelectedModel;
@@ -247,9 +250,10 @@ private:
     VkSampleCountFlagBits getMaxUsableSampleCount();
     //bool hasStencilComponent(VkFormat format);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    
     void cleanup();
 
-
+    static void mouse_callback(GLFWwindow* window, int key, int action, int mods);
 
     
 };

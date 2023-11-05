@@ -25,7 +25,7 @@ public:
 	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
-	glm::mat4 frustrum;
+	
 
 	float lastTime;
 	glm::vec3 Position;// = glm::vec3(6.1f, 0.1f, 6.12f);
@@ -43,9 +43,11 @@ public:
 	bool firstClick = true;
 	bool LockKey = false;
 
+	
 	Camera(float width, float height);
 
 	void UpdateMatrices(float FOV, Model* model);
+	int pickModel(std::vector<Model*> scene, GLFWwindow* window);
 	void UpdateInputs(GLFWwindow* window);
 	
 };

@@ -16,7 +16,7 @@
 #include <glm/ext/matrix_float4x4_precision.hpp>
 #include <glm/gtx/hash.hpp>
 
-std::string clear_slash(std::string const& path_of_file, std::string const& d_slash = "/\\")
+std::string inline clear_slash(std::string const& path_of_file, std::string const& d_slash = "/\\")
 {
 	size_t index_of_slash = path_of_file.find_last_of(d_slash);
 	std::string file_name = path_of_file.substr(index_of_slash + 1);
@@ -24,7 +24,7 @@ std::string clear_slash(std::string const& path_of_file, std::string const& d_sl
 }
 
 
-static std::vector<char> readFile(const std::string& filename)
+static std::vector<char> inline readFile(const std::string& filename)
 {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -44,7 +44,7 @@ static std::vector<char> readFile(const std::string& filename)
 }
 
 
-bool DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm::vec3& rotation, glm::vec3& scale)
+bool inline DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm::vec3& rotation, glm::vec3& scale)
 {
 	// From glm::decompose in matrix_decompose.inl
 
@@ -119,7 +119,7 @@ bool DecomposeTransform(const glm::mat4& transform, glm::vec3& translation, glm:
 }
 
 // https://stackoverflow.com/questions/9543715/generating-human-readable-usable-short-but-unique-ids
-void GenerateUUID(Model* model, int length ,bool useBase62)
+void inline GenerateUUID(Model* model, int length ,bool useBase62)
 {
 	const char* baseChars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 	int baseLength = useBase62 ? 62 : 36;
@@ -133,7 +133,7 @@ void GenerateUUID(Model* model, int length ,bool useBase62)
 	model->UUID = ss.str();
 }
 
-glm::vec3 rayCast(double xpos, double ypos, double WIDTH, double HEIGHT, glm::mat4 projection, glm::mat4 view) {
+glm::vec3 inline rayCast(double xpos, double ypos, double WIDTH, double HEIGHT, glm::mat4 projection, glm::mat4 view) {
 	// converts a position from the 2d xpos, ypos to a normalized 3d direction
 	float x = (2.0f * xpos) / WIDTH - 1.0f;
 	float y = 1.0f - (2.0f * ypos) / HEIGHT;
@@ -153,6 +153,5 @@ glm::vec3 rayCast(double xpos, double ypos, double WIDTH, double HEIGHT, glm::ma
 	
 	return ray_wor;
 }
-
 
 #endif

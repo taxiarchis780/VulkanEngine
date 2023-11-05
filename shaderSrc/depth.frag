@@ -54,7 +54,7 @@ void main() {
     result = pow(result, vec3(1.0f/gamma));
 
     float depth = LinearizeDepth(gl_FragCoord.z) / 100.0f;
-    outColor = texture(texSampler, fragTexCoord) * vec4(result, 1.0f);
-    
+    //outColor = depth * texture(texSampler, fragTexCoord) * vec4(result, 1.0f);
+    outColor = vec4(vec3(depth) , 1.0f);
 
 }

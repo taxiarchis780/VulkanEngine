@@ -1,7 +1,8 @@
 ﻿#include "Engine.h"
 #include <map>
 #include <sstream>
-#include "util.h"
+
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -9,55 +10,16 @@
 #include <unordered_map>
 
 
-
-
-
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messaegSeverit, VkDebugUtilsMessageTypeFlagsEXT messsageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
-{
-    std::cerr << "ERROR in validation layer: " << pCallbackData->pMessage << std::endl;
-
-    return VK_FALSE;
-}
-
 static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
 {
-    auto app = reinterpret_cast<Engine*>(glfwGetWindowUserPointer(window));
-    app->framebufferResized = true;
+    auto engine = reinterpret_cast<Engine*>(glfwGetWindowUserPointer(window));
+    engine->framebufferResized = true;
 }
 
-void Engine::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
-{
-    createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo.pfnUserCallback = debugCallback;
-}
-
-void Engine::setupDebugMessenger()
-{
-    if (!enableValidationLayers) return;
-
-    VkDebugUtilsMessengerCreateInfoEXT createInfo;
-    populateDebugMessengerCreateInfo(createInfo);
-    if(CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS)
-    {
-        throw std::runtime_error("ERROR: Failed to set up debug messenger!");
-    }
-}
-
-void Engine::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
-{
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-    if (func != nullptr) {
-        func(instance, debugMessenger, pAllocator);
-    }
-}
 
 void Engine::run()
 {
-    
+     
     initWindow();
     initVulkan();
     if (enableimGUI)
@@ -75,6 +37,7 @@ Engine::Engine(uint32_t width, uint32_t height, char* title, char* version)
     HEIGHT = height;
     TITLE = title;
     VERSION = version;
+    
 }
 
 void Engine::initWindow()
@@ -86,7 +49,10 @@ void Engine::initWindow()
 
     window = glfwCreateWindow(WIDTH, HEIGHT, TITLE, nullptr, nullptr);
     monitor = glfwGetPrimaryMonitor();
-    
+    glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
+    glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
+    glfwSetWindowUserPointer(window, (void*)this);
+    glfwSetMouseButtonCallback(window, mouse_callback);
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 }
@@ -103,9 +69,11 @@ void Engine::initVulkan()
     createRenderPass();
     createDescriptorSetLayout();
     
+    createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/shader_frag.spv");
+    createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/depth_frag.spv");
+    createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/laocoon_frag.spv");
     
-    createGraphicsPipelineWrapper("res/shaders/vert.spv", "res/shaders/frag.spv");
-    createGraphicsPipelineWrapper("res/shaders/vert.spv", "res/shaders/depth.spv");
+    
     createCommandPool();
     createColorResources();
     createDepthResources();
@@ -116,15 +84,13 @@ void Engine::initVulkan()
     loadScene();
     loadFile(scene_path);
 
-    
-    
     for (size_t i = 0; i < sceneSize; ++i)
     {
         createTextureImage(scene[i]);
         createTextureImageView(scene[i]);
         createTextureSampler(scene[i]);
         createVertexBuffer(scene[i]);
-        createIndexBuffer(scene[i]);
+        createIndexBuffer(scene[i]); 
         createUniformBuffers(scene[i]);
         createDescriptorPool(scene[i]);
         createDescriptorSets(scene[i]);
@@ -137,35 +103,8 @@ void Engine::initVulkan()
     createSyncObjects();
 }
 
-void Engine::initImGui()
-{
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    io = ImGui::GetIO(); (void)io;
-    io.Fonts->AddFontFromFileTTF("res/fonts/OpenSans-Regular.ttf", 18.0f);
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;   // Disable the fucking mouse
-    
-    io.MouseDrawCursor = false;
-    ImGui_ImplGlfw_InitForVulkan(window, true);
-    
-    ImGui_ImplVulkan_InitInfo info{};
-    info.Instance = instance;
-    info.PhysicalDevice = physicalDevice;
-    info.Device = device;
-    info.Queue = graphicsQueue;
-    info.DescriptorPool = imGuiDP;
-    info.MinImageCount = MAX_FRAMES_IN_FLIGHT;
-    info.ImageCount = MAX_FRAMES_IN_FLIGHT;
-    info.MSAASamples = msaaSamples;
-    ImGui_ImplVulkan_Init(&info, renderPass);
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-    ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-    endSingleTimeCommands(commandBuffer);
-    vkDeviceWaitIdle(device);
 
-    ImGui_ImplVulkan_DestroyFontUploadObjects();
-}
+
 
 void Engine::recreateSwapChain()
 {
@@ -210,6 +149,7 @@ void Engine::cleanupSwapChain()
 /// that the application in running at e.g. on a computer that the engine runs at 2K FPS the camera is going to move faster than a computer 
 /// that is running at 60 FPS
 /// </summary>
+
 void Engine::mainLoop()
 {
     while(!glfwWindowShouldClose(window))
@@ -221,7 +161,7 @@ void Engine::mainLoop()
         
         if (deltaTime >= 0.016) // update every 16 ms (updates 60 times per second)
         {
-            camera->UpdateInputs(window);
+            camera->UpdateInputs(window);           
             lastTime1 = currentTime;
         }
         
@@ -279,128 +219,7 @@ void Engine::createSurface()
 }
 
 
-void Engine::pickPhysicalDevice()
-{
-    
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    VkResult res = vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-    VkPhysicalDeviceProperties deviceProperties;
-    
-    if (deviceCount == 0) {
-        throw std::runtime_error("ERROR: failed to find GPUs with Vulkan support!");
-    }
-    
 
-
-    std::multimap<int, VkPhysicalDevice> candidates;
-    
-    for (const auto& device : devices)
-    {
-        int score = 0;
-        vkGetPhysicalDeviceProperties(device, &deviceProperties);
-        if(isDeviceSuitable(device))
-        {
-            score = rateDeviceSuitability(device); 
-            candidates.insert(std::make_pair(score, device));
-        }
-        //printf("%s with score: %d\n", &deviceProperties.deviceName, score);
-        std::stringstream ss;
-        
-        ss << deviceProperties.deviceName << " with score: " << score;
-
-        tlog::info(ss.str());
-    }
-    
-    
-    
-    if (candidates.rbegin()->first > 0) {
-        physicalDevice = candidates.rbegin()->second;
-        msaaSamples = getMaxUsableSampleCount();
-    } else {
-        throw std::runtime_error("ERROR: failed to find a suitable GPU!");
-    }
-
-    //This is done to find out the score
-    
-    vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-    
-    //printf("Card: %s selected with score: %d\n", &deviceProperties.deviceName, candidates.rbegin()->first);
-    std::stringstream ss;
-    RendererName = std::string(deviceProperties.deviceName);
-    ss << "Card: " << deviceProperties.deviceName << " selected with score: " << candidates.rbegin()->first;
-    tlog::none();
-    tlog::info(ss.str());
-}
-bool Engine::isDeviceSuitable(VkPhysicalDevice device)
-{
-    QueueFamilyIndices indices = findQueueFamilies(device);
-    bool extensionsSupported = checkDeviceExtensionSupport(device);
-    bool swapChainAdequate = false;
-    VkPhysicalDeviceFeatures supportedFeatures;
-    vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
-    if(extensionsSupported)
-    {
-        SwapChainSupportDetails SwapChainSupport = querySwapChainSupport(device);
-        swapChainAdequate = !SwapChainSupport.formats.empty() && !SwapChainSupport.presentModes.empty();
-    }
-    
-    return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
-}
-bool Engine::checkDeviceExtensionSupport(VkPhysicalDevice device)
-{
-    uint32_t extensionCount;
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
-    std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
-    for(const auto& extension : availableExtensions)
-    {
-        requiredExtensions.erase(extension.extensionName);
-    }
-    return requiredExtensions.empty();
-}
-int Engine::rateDeviceSuitability(VkPhysicalDevice device)
-{
-    VkPhysicalDeviceProperties deviceProperties;
-    VkPhysicalDeviceFeatures deviceFeatures;
-    VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
-    
-    vkGetPhysicalDeviceProperties(device, &deviceProperties);
-    vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
-    vkGetPhysicalDeviceMemoryProperties(device, &deviceMemoryProperties);
-
-    int score = 0;
-    // Discrete GPUs have a significant performance advantage
-    if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-        score += 1000;
-    } else if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
-    {
-        score += 100;
-    }
-    // Maximum possible size of textures affects graphics quality
-    score += deviceProperties.limits.maxImageDimension2D;
-    // Application can't function without geometry shaders
-    if (!deviceFeatures.geometryShader) {
-        return 0;
-    }
-    // https://stackoverflow.com/questions/44339931/query-amount-of-vram-or-gpu-clock-speed
-    auto heapsPointer = deviceMemoryProperties.memoryHeaps;
-    auto heaps = std::vector<VkMemoryHeap>(heapsPointer, heapsPointer + deviceMemoryProperties.memoryHeapCount);
-    //std::cout << deviceProperties.deviceName << std::endl;
-    
-    for (const auto& heap : heaps)
-    {
-        if (heap.flags & VkMemoryHeapFlagBits::VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-        {
-            score += heap.size/100000; 
-        }
-    }
-
-    return score;
-
-}
 Engine::QueueFamilyIndices Engine::findQueueFamilies(VkPhysicalDevice device)
 {
     QueueFamilyIndices indices;
@@ -508,6 +327,7 @@ void Engine::createLogicalDevice()
 
     VkPhysicalDeviceFeatures deviceFeatures{};
     deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.depthClamp = VK_TRUE;
     
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -618,12 +438,7 @@ std::vector<const char*> Engine::getRequiredExtensions()
     return extensions;
 }
 
-VkResult Engine::CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
-{
-    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-    if(func != nullptr) {return func(instance, pCreateInfo, pAllocator, pDebugMessenger);}
-    else { return VK_ERROR_EXTENSION_NOT_PRESENT;}
-}
+
 
 void Engine::createImageViews()
 {
@@ -773,7 +588,7 @@ void Engine::createGraphicsPipeline(int index,std::string vertShaderPath, std::s
 
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.depthClampEnable = VK_TRUE;
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
@@ -917,9 +732,11 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    
     if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
         throw std::runtime_error("failed to begin recording command buffer!");
     }
+    
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -958,6 +775,8 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
 
     for (size_t i = 0; i < scene.size(); ++i)
     {
+        if (mCurrentSelectedModel == scene[i])
+            continue;
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &scene[i]->vertexBuffer, offsets);
 
         vkCmdBindIndexBuffer(commandBuffer, scene[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
@@ -965,6 +784,18 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts[currentPipeline], 0, 1, &scene[i]->descriptorSets[currentFrame], 0, nullptr);
 
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(scene[i]->indices.size()), 1, 0, 0, 0);
+    }
+
+    if(mCurrentSelectedModel != nullptr) // draw with different shader
+    {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[2]);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mCurrentSelectedModel->vertexBuffer, offsets);
+
+        vkCmdBindIndexBuffer(commandBuffer, mCurrentSelectedModel->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts[currentPipeline], 0, 1, &mCurrentSelectedModel->descriptorSets[currentFrame], 0, nullptr);
+
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mCurrentSelectedModel->indices.size()), 1, 0, 0, 0);
     }
 
     if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS && !LockImGui)
@@ -997,385 +828,35 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
         throw std::runtime_error("ERROR: failed to record command buffer!");
     }
 
-    
-
 }
 
-void Engine::updateImGui(VkCommandBuffer commandBuffer)
+
+
+void Engine::mouse_callback(GLFWwindow* window, int button, int action, int mods)
 {
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    renderImGui();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
-}
-
-void Engine::renderImGui()
-{
-    static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
-    static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
-    static bool isComponentsSelected = true;
-    ImGui::NewFrame();
-
-    //ImGui::SetNextWindowPos(ImVec2(swapChainExtent.width - 735 , 0));
-    if (isComponentsSelected) ImGui::SetNextWindowSize(ImVec2(427, swapChainExtent.height));
-    else ImGui::SetNextWindowSize(ImVec2(600, swapChainExtent.height));
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::Begin("Main", 0, ImGuiWindowFlags_NoMove);
-    ImGui::BeginTabBar("##TabBar");
-    if (ImGui::BeginTabItem("Components"))
+    Engine* engine = reinterpret_cast<Engine*>(glfwGetWindowUserPointer(window)); //This is so fucking retarded
+    // Camera* camera = reinterpret_cast<Engine*>(glfwGetWindowUserPointer(window))->camera; // this is even more disgusting
+    if (action != GLFW_PRESS)
+        return;
+    switch (button)
     {
-        isComponentsSelected = true;
-        ImGui::Text("Renderer: %s", RendererName.c_str());
-
-        ImGui::Text("CURRENT SELECTED MODEL");
-
-        uint8_t count = 0;
-        for (size_t i = 0; i < scene.size(); ++i)
+        case GLFW_MOUSE_BUTTON_2:
         {
-            count++;
-            if (ImGui::RadioButton(std::to_string(i).c_str(), mCurrentSelectedModel == scene[i]))
-                mCurrentSelectedModel = scene[i];
-            if (count % 3 == 0)
+            int index = engine->camera->pickModel(engine->scene, window);
+            if (index != -1 && engine->camera->LockCamera)
             {
-                count = 0;
-                ImGui::Spacing();
-                continue;
-            }
-
-            ImGui::SameLine();
-        }
-        if (ImGui::Checkbox("LightTranslate", &lightTranslateEnable) && lightTranslateEnable)
-        {
-            mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-        }
-
-        
-        
-
-        ImGui::Checkbox("EditScene", &editScene);
-        if (editScene)
-        {
-            ImGui::InputText("SceneName", &scene_name);
-            if (ImGui::Button("Refresh"))
-            {
-                traceScenesDir("res/data/");
-            }
-            if (ImGui::BeginListBox("Scenes", ImVec2(200, 100))) {
-                static size_t item_current_idx = 0;
-                for (size_t i = 0; i < scene_paths.size(); ++i)
-                {
-                    const bool isSelected = (item_current_idx == i);
-                    if (ImGui::Selectable(scene_paths[i].c_str(), isSelected))
-                    {
-                        item_current_idx = i;
-                        scene_path = scene_paths[i];
-                    }
-                    if (isSelected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndListBox();
-            }
-            if (ImGui::Button("LoadScene"))
-            {
-                resetScene();
-            }
-            if (ImGui::Button("SaveToSelected"))
-            {
-                writeToFile(scene);
-            } ImGui::SameLine();
-            if (ImGui::Button("SaveToInput"))
-            {
-                scene_path = scene_name;
-                writeToFile(scene);
+                engine->mCurrentSelectedModel = engine->scene[index];
             }
         }
-
-        if (ImGui::Button("Update Graphics Pipeline"))
+        break;
+        case GLFW_MOUSE_BUTTON_3: // test
         {
-            shouldUpdatePipeline = true;
-        }
-
-        if(mCurrentSelectedModel)
-        {
-            ImGui::InputText("UUID", &mCurrentSelectedModel->UUID);
-            if (ImGui::Button("Generate UUID"))
-            {
-                GenerateUUID(mCurrentSelectedModel, 8, true);
-            }
-            ImGui::SliderFloat("FOV", &FOV, 10.0f, 120.0f, NULL);
-            ImGui::SliderFloat3("ModelPos", glm::value_ptr(mCurrentSelectedModel->translationVec), -5.0f, 5.0f, NULL);
-            ImGui::SliderFloat3("ModelRot", glm::value_ptr(mCurrentSelectedModel->rotationVec), 0.0f, 6.28f, NULL);
-            ImGui::SliderFloat3("ModelScale", glm::value_ptr(mCurrentSelectedModel->scaleVec), 0.001f, 10.0f, NULL);
-            ImGui::SliderFloat3("LightPos", glm::value_ptr(camera->lightPos), -5.0f, 5.0f, NULL);
-
-
-
-            ImGui::Text("CURRENT GIZMO OPERATION:");
-            if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
-                mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("Rotation", mCurrentGizmoOperation == ImGuizmo::ROTATE))
-                mCurrentGizmoOperation = ImGuizmo::ROTATE;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
-                mCurrentGizmoOperation = ImGuizmo::SCALE;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
-                mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
-            ImGui::Text("GuizmoMode");
-            if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
-                mCurrentGizmoMode = ImGuizmo::LOCAL;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
-                mCurrentGizmoMode = ImGuizmo::WORLD;
-
-
-            //ImGuiColorEditFlags_PickerHueWheel
-            ImGui::ColorPicker3("lightColor", glm::value_ptr(camera->lightColor), ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_NoAlpha);
-            ImGui::Text("Selected Model Material");
-            ImGui::SliderFloat3("Ambient", glm::value_ptr(mCurrentSelectedModel->material.ambient), 0.0f, 10.0f, NULL);
-            ImGui::SliderFloat3("Diffuse", glm::value_ptr(mCurrentSelectedModel->material.diffuse), 0.0f, 10.0f, NULL);
-            ImGui::SliderFloat3("Specular", glm::value_ptr(mCurrentSelectedModel->material.specular), 0.0f, 10.0f, NULL);
-            ImGui::SliderFloat("Shininess", &mCurrentSelectedModel->material.shininess.r, 0.1f, 360.0f, NULL, ImGuiSliderFlags_Logarithmic);
-
-        }
-
-        ImGui::InputText("Model", &model_path);
-        ImGui::InputText("Texture", &texture_path);
-        if (ImGui::Button("Add Model"))
-        {
-            Model* cModel = nullptr;
-            try {
-                cModel = new Model("models/" + model_path, "textures/" + texture_path);
-                GenerateUUID(cModel, 8, true);
-                loadModel(cModel);
-                createTextureImage(cModel);
-                createTextureImageView(cModel);
-                createTextureSampler(cModel);
-                createVertexBuffer(cModel);
-                createIndexBuffer(cModel);
-                createUniformBuffers(cModel);
-                createDescriptorPool(cModel);
-                createDescriptorSets(cModel);
-                addtoScene(cModel);
-                statsFaces += cModel->statsFaces;
-            }
-            catch (const std::exception& e) {
-                delete cModel;
-                std::cerr << e.what() << std::endl;
-
-            }
-        }
-        if (ImGui::Button("Delete Selected Model"))
-        {
-            std::vector<Model*> newScene;
-            for (size_t i = 0; i < scene.size(); i++)
-            {
-                if (strcmp(scene[i]->UUID.c_str(), mCurrentSelectedModel->UUID.c_str()))
-                {
-                    newScene.push_back(scene[i]);
-                }
-
-            }
-            shouldDestroy = true;
-
-            scene.resize(0);
-            for (size_t i = 0; i < newScene.size(); i++)
-            {
-                scene.push_back(newScene[i]);
-            }
-            statsFaces -= mCurrentSelectedModel->statsFaces;
-        }
-
-        ImGui::Checkbox("AddModel", &addModel);
-        if (addModel)
-        {
-            if (ImGui::Button("Refresh"))
-            {
-                traceDir("res/models/", "res/textures/");
-            }
-            if (ImGui::BeginListBox("Models", ImVec2(200, 100))) {
-                static size_t item_current_idx = 0;
-                for (size_t i = 0; i < model_paths.size(); ++i)
-                {
-                    const bool isSelected = (item_current_idx == i);
-                    if (ImGui::Selectable(model_paths[i].c_str(), isSelected))
-                    {
-                        item_current_idx = i;
-                        model_path = model_paths[i];
-                    }
-                    if (isSelected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndListBox();
-            }
-
-            if (ImGui::BeginListBox("Textures", ImVec2(200, 100))) {
-                static size_t item_current_idx2 = 0;
-                for (size_t i = 0; i < texture_paths.size(); ++i)
-                {
-                    const bool isSelected = (item_current_idx2 == i);
-                    if (ImGui::Selectable(texture_paths[i].c_str(), isSelected))
-                    {
-                        item_current_idx2 = i;
-                        texture_path = texture_paths[i];
-                    }
-                    if (isSelected)
-                        ImGui::SetItemDefaultFocus();
-                }
-
-                ImGui::EndListBox();
-            }
-
-        }
-
-        ImGui::EndTabItem();
-    }
-
-    if (ImGui::BeginTabItem("Scene"))
-    {
-        isComponentsSelected = false;
-        if (ImGui::BeginTable("CameraPos", 4))
-        {
-            ImGui::TableSetupColumn("POS");
-            ImGui::TableSetupColumn("X");
-            ImGui::TableSetupColumn("Y");
-            ImGui::TableSetupColumn("Z");
-            ImGui::TableHeadersRow();
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::Text("Camera Position");
-            ImGui::TableNextColumn();
-            ImGui::Text("%.5f", camera->Position.x);
-            ImGui::TableNextColumn();
-            ImGui::Text("%.5f", camera->Position.y);
-            ImGui::TableNextColumn();
-            ImGui::Text("%.5f", camera->Position.z);
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::Text("Orientation");
-            ImGui::TableNextColumn();
-            ImGui::Text("%.5f", camera->Orientation.x);
-            ImGui::TableNextColumn();
-            ImGui::Text("%.5f", camera->Orientation.y);
-            ImGui::TableNextColumn();
-            ImGui::Text("%.5f", camera->Orientation.z);
-            ImGui::EndTable();
-
-        }
-
-
-        if (ImGui::BeginTable("Scene Details", 3))
-        {
-            ImGui::TableSetupColumn("MODEL");
-            ImGui::TableSetupColumn("ID");
-            ImGui::TableSetupColumn("TRIANGLES");
-
-            ImGui::TableHeadersRow();
-
-            for (size_t i = 0; i < scene.size(); ++i)
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::Text(scene[i]->MODEL_PATH.c_str());
-                ImGui::TableNextColumn();
-                ImGui::Text(scene[i]->UUID.c_str());
-                ImGui::TableNextColumn();
-                ImGui::Text("%d", scene[i]->statsFaces);
-
-            }
-            ImGui::EndTable();
-        }
-        ImGui::EndTabItem();
-    }
-    ImGui::EndTabBar();
-    ImGui::End();
-    
-    if (true)
-    {
-        
-        if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
-        {
-            mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-        }
-        if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
-        {
-            mCurrentGizmoOperation = ImGuizmo::ROTATE;
-        }
-        if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS)
-        {
-            mCurrentGizmoOperation = ImGuizmo::SCALE;
-        }
-        if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
-        {
-            mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
-        }
-        if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && lockPipeline) // shity lock mechanic
-        {
-            lockPipeline = false;
-            currentPipeline = !currentPipeline;
-            printf("\r%d", currentPipeline);
-        }
-        if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE)
-        {
-            lockPipeline = true;
-        }
-        
-        if (false && glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS ) // this is the worst code i have ever written // currently doesn't work
-        {
-            for (size_t i = 0; i < scene.size(); ++i)
-            {
-                scene[i]->collider.center = scene[i]->translationVec;
-                scene[i]->collider.depth = 80.0f;
-                scene[i]->collider.width = 50.0f;
-                scene[i]->collider.height = 100.0f;
-
-                bool collide = scene[i]->collider.rayIntersects(camera->Position, camera->Orientation);
-
-                if (collide)
-                {
-                    mCurrentSelectedModel = scene[i];
-                }
-                else {
-                    printf("False!");
-                }
-            }
-        }
-        
-        ImGuizmo::SetOrthographic(true);
-        ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
-
-        ImGuizmo::SetRect(0, 0, swapChainExtent.width, swapChainExtent.height);
-        if (!lightTranslateEnable && mCurrentSelectedModel != nullptr)
-        {
-            ImGuizmo::Manipulate(glm::value_ptr(camera->view), glm::value_ptr(camera->proj), mCurrentGizmoOperation, mCurrentGizmoMode, glm::value_ptr(mCurrentSelectedModel->transform));
-
-            if (ImGuizmo::IsUsing())
-            {
-                glm::vec3 translation, rotation, scale;
-                DecomposeTransform(mCurrentSelectedModel->transform, translation, rotation, scale);
-                mCurrentSelectedModel->translationVec = translation;
-                mCurrentSelectedModel->rotationVec = rotation;
-                mCurrentSelectedModel->scaleVec = scale;
-            }
-        }
-        else if (mCurrentSelectedModel != nullptr){
-            ImGuizmo::Manipulate(glm::value_ptr(camera->view), glm::value_ptr(camera->proj), mCurrentGizmoOperation, mCurrentGizmoMode, glm::value_ptr(camera->lightMat));
-
-            if (ImGuizmo::IsUsing())
-            {
-                glm::vec3 translation, rotation, scale;
-                DecomposeTransform(camera->lightMat, translation, rotation, scale);
-                camera->lightPos = translation;
-                
-            }
-        }
-        
+            printf("Hellow MB3");
+        }break;
+        default:
+            break;
     }
     
-    ImGui::Render();
 }
 
 void Engine::createSyncObjects()
@@ -1409,15 +890,16 @@ void Engine::drawFrame()
         cleanUpModel(mCurrentSelectedModel);
         mCurrentSelectedModel = scene.back();
     }
-    if (shouldResetScene && scene.size())
+    if (shouldResetScene && (scene.size() || strcmp(scene_path.c_str(), "res/data/empty.json")))
     {
+        
         vkQueueWaitIdle(graphicsQueue);
         for (auto& cModel : scene)
         {
             cleanUpModel(cModel);
-            //statsFaces -= cModel->statsFaces;
+            statsFaces -= cModel->statsFaces;
         }
-        mCurrentSelectedModel = nullptr;
+        mCurrentSelectedModel = nullptr; 
         scene.resize(0);
         shouldResetScene = false;
 
@@ -1448,9 +930,9 @@ void Engine::drawFrame()
         }
         graphicsPipelines.resize(0); // reset sizes
         pipelineLayouts.resize(0); 
-        createGraphicsPipelineWrapper("res/shaders/vert.spv", "res/shaders/frag.spv");
-        createGraphicsPipelineWrapper("res/shaders/vert.spv", "res/shaders/depth.spv");
-
+        createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/shader_frag.spv");
+        createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/depth_frag.spv");
+        createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/laocoon_frag.spv");
         shouldUpdatePipeline = false;
     }
     
@@ -1571,43 +1053,9 @@ void Engine::createIndexBuffer(Model* model)
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-void Engine::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
-{
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = size;
-    bufferInfo.usage = usage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-        throw std::runtime_error("ERROR:failed to create buffer!");
-    }
 
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
 
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-
-    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-        throw std::runtime_error("ERROR: failed to allocate buffer memory!");
-    }
-
-    vkBindBufferMemory(device, buffer, bufferMemory, 0);
-}
-
-void Engine::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
-{
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-    VkBufferCopy copyRegion{};
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-    endSingleTimeCommands(commandBuffer);
-}
 
 
     
@@ -1705,25 +1153,6 @@ void Engine::createDescriptorPool(Model* model)
 }
 
 
-void Engine::createImGuiDP()
-{
-    std::array<VkDescriptorPoolSize, 2> poolSizes{};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2;
-
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2;
-
-    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &imGuiDP) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor pool!");
-    }
-}
 
 void Engine::createDescriptorSets(Model* model)
 {
@@ -1772,38 +1201,7 @@ void Engine::createDescriptorSets(Model* model)
     }
 }
 
-VkCommandBuffer Engine::beginSingleTimeCommands() {
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = commandPool;
-    allocInfo.commandBufferCount = 1;
 
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-    return commandBuffer;
-}
-
-void Engine::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
-    vkEndCommandBuffer(commandBuffer);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(graphicsQueue);
-
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
-}
 
 void Engine::createTextureImage(Model* model)
 {
@@ -2258,7 +1656,6 @@ void Engine::loadModel(Model* model) {
     model->material.specular = glm::vec3(materials[0].specular[0], materials[0].specular[1], materials[0].specular[2]);
     model->material.shininess = glm::vec3(materials[0].shininess, 0.0f, 0.0f);
     
-    
     model->statsFaces = static_cast<int>((model->indices.size()/3));
     printf("\n");
     tlog::none();
@@ -2417,21 +1814,11 @@ void Engine::cleanup()
 
     for (size_t i = 0; i < scene.size(); ++i)
     {
-        for (auto& ubo : scene[i]->uniformBuffers)
-            vkDestroyBuffer(device, ubo, nullptr);
-        for (auto& mem : scene[i]->uniformBuffersMemory)
-            vkFreeMemory(device, mem, nullptr);
-        vkDestroyDescriptorPool(device, scene[i]->descriptorPool, nullptr);
-        vkDestroySampler(device, scene[i]->textureSampler, nullptr);
-        vkDestroyImageView(device, scene[i]->textureImageView, nullptr);
-        vkDestroyImage(device, scene[i]->textureImage, nullptr);
-        vkFreeMemory(device, scene[i]->textureImageMemory, nullptr);
-        vkDestroyBuffer(device, scene[i]->vertexBuffer, nullptr);
-        vkFreeMemory(device, scene[i]->vertexBufferMemory, nullptr);
-        vkDestroyBuffer(device, scene[i]->indexBuffer, nullptr);
-        vkFreeMemory(device, scene[i]->indexBufferMemory, nullptr);
-        free(scene[i]);
+        
+        cleanUpModel(scene[i]);
     }
+
+    
     
     for (auto& pipeline : graphicsPipelines)
     {

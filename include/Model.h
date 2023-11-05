@@ -13,7 +13,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/vector_angle.hpp>
-#include <BasicCollider.h>
+
 
 class Model // FOR SOME FUCKING REASON THE ORDER THAT I DECLARE SCALE TRANSLATION AND ROTATION MATTERS AND FOR SOME OTHER FUCKING REASON THIS CANT BE STRUCT BECAUSE IT SEG FAULTS WTF IS WRONG WITH THIS CURSED FILE
 {
@@ -32,7 +32,7 @@ public:
 	glm::vec3 translationVec = glm::vec3(0.0);
 	glm::vec3 rotationVec = glm::vec3(0.0f);
 
-	BoundingBox collider;
+	
 
 	Material material;
 	unsigned int statsFaces = 0;

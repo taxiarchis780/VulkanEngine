@@ -25,3 +25,15 @@
         ImGui::EndTable();
     }
 */
+
+
+/*
+    if (button == GLFW_MOUSE_BUTTON_2 && action == GLFW_PRESS)
+    {
+        int index = engine->camera->pickModel(engine->scene, window);
+        if (index != -1 && engine->camera->LockCamera)
+        {
+            engine->mCurrentSelectedModel = engine->scene[index];
+        }
+    }
+*/
