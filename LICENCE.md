@@ -1,3 +1,7 @@
+This work © 2023 by Taxiarchis Evangelopoulos is licensed under Attribution-NonCommercial 4.0 International 
+
+=======================================================================
+
 Attribution-NonCommercial 4.0 International
 
 =======================================================================
