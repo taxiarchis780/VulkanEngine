@@ -6,6 +6,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 #include <vulkan/vulkan.h>
+/*
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -16,6 +17,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/vector_angle.hpp>
+*/
+#include "glmIncludes.h"
 #include <chrono>
 #include <Model.h>
 
@@ -26,8 +29,6 @@ public:
 	glm::mat4 view;
 	glm::mat4 proj;
 	
-
-	float lastTime;
 	glm::vec3 Position;// = glm::vec3(6.1f, 0.1f, 6.12f);
 	glm::vec3 Orientation;// = glm::vec3(-2.5f, 0.0f, -0.5f);
 	glm::vec3 Up = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -39,14 +40,15 @@ public:
 	float velocity = 0.1f;
 	float sensitivity = 100.0f;
 	float pitch = 0.0f;
+	float FOV = 90.0f;
 	bool LockCamera = true; 
 	bool firstClick = true;
-	bool LockKey = false;
+
 
 	
 	Camera(float width, float height);
 
-	void UpdateMatrices(float FOV, Model* model);
+	void UpdateMatrices(Model* model);
 	int pickModel(std::vector<Model*> scene, GLFWwindow* window);
 	void UpdateInputs(GLFWwindow* window);
 	

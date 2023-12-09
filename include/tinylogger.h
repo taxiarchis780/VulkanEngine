@@ -17,6 +17,8 @@
 #   define NOMINMAX
 #   include <Windows.h>
 #   undef NOMINMAX
+#   undef max
+#   undef min
 #else
 #   include <sys/ioctl.h>
 #   include <unistd.h>
@@ -125,6 +127,7 @@ namespace tlog {
 
         // Build the progress bar itself. Looks like so:
         // [=================>                         ]
+
         int usableWidth = std::max(0, width
             - 2 // The surrounding [ and ]
             - 1 // Space between progress bar and label

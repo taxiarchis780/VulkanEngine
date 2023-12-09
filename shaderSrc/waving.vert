@@ -36,7 +36,16 @@ layout(location = 6) out vec3 alightColor;
 layout(location = 7) out Material mMaterial;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.transform * vec4(inPosition, 1.0);
+
+    vec4 worldPos = ubo.transform * vec4(inPosition, 1.0);
+
+    // Take the world space location, and wave it around a little.
+    float wobbleOffset = (worldPos.x + worldPos.z) * 0.5;
+    float wobbleScale  = 0.4;
+    worldPos.x += cos(ubo.time + wobbleOffset) * wobbleScale;
+    worldPos.z += sin(ubo.time + wobbleOffset) * wobbleScale;
+
+    gl_Position = ubo.proj * ubo.view * worldPos;
     fragColor = inColor;
     aNormal = mat3(transpose(inverse(ubo.transform))) * normal;  
     lightPos = ubo.lightPos;//vec3(2.3f, -2.6f, 5.0f);

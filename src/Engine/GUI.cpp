@@ -33,7 +33,7 @@ void Engine::initImGui()
     io.Fonts->AddFontFromFileTTF("res/fonts/OpenSans-Regular.ttf", 18.0f);
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;   // Disable the fucking mouse
-
+    io.IniFilename = "res/config/imgui.ini";
     io.MouseDrawCursor = false;
     ImGui_ImplGlfw_InitForVulkan(window, true);
 
@@ -53,6 +53,9 @@ void Engine::initImGui()
     vkDeviceWaitIdle(device);
 
     ImGui_ImplVulkan_DestroyFontUploadObjects();
+
+    mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+    mCurrentGizmoMode = ImGuizmo::LOCAL;
 }
 
 void Engine::updateImGui(VkCommandBuffer commandBuffer)
@@ -66,8 +69,7 @@ void Engine::updateImGui(VkCommandBuffer commandBuffer)
 
 void Engine::renderImGui()
 {
-    static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
-    static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
+    
     static bool isComponentSelected = true;
     ImGui::NewFrame();
 
@@ -113,7 +115,7 @@ void Engine::renderImGui()
             ImGui::InputText("SceneName", &scene_name);
             if (ImGui::Button("Refresh"))
             {
-                traceScenesDir("res/data/");
+                findFiles("res/data/user/", ".json");
             }
             if (ImGui::BeginListBox("Scenes", ImVec2(200, 100))) {
                 static size_t item_current_idx = 0;
@@ -152,21 +154,36 @@ void Engine::renderImGui()
 
         if (ImGui::Button("Update Graphics Pipeline"))
         {
-            shouldUpdatePipeline = true;
+           state = STATE_UPDATE_PIPELINE;
         }
 
+
+        ImGui::InputText("VertexPath", &vert_path);
+        ImGui::InputText("FragmentPath", &frag_path);
+
+        if (ImGui::Button("Create Graphics Pipeline"))
+        {
+            createGraphicsPipelineWrapper(vert_path, frag_path);
+        }
+        ImGui::SliderFloat3("LightPos", glm::value_ptr(camera->lightPos), -5.0f, 5.0f, NULL);
+        ImGui::ColorPicker3("lightColor", glm::value_ptr(camera->lightColor), ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_NoAlpha);
+
+        if (ImGui::SliderFloat("AudioVolume", &audioMgr->volume, 0.0f, 1.0f, NULL))
+        {
+            audioMgr->changeVolume();
+        }
         if (mCurrentSelectedModel)
         {
             ImGui::InputText("UUID", &mCurrentSelectedModel->UUID);
             if (ImGui::Button("Generate UUID"))
             {
-                GenerateUUID(mCurrentSelectedModel, 8, true);
+                util::GenerateUUID(mCurrentSelectedModel, 8, true);
             }
-            ImGui::SliderFloat("FOV", &FOV, 10.0f, 120.0f, NULL);
-            ImGui::SliderFloat3("ModelPos", glm::value_ptr(mCurrentSelectedModel->translationVec), -5.0f, 5.0f, NULL);
+            ImGui::SliderFloat("FOV", &camera->FOV, 10.0f, 120.0f, NULL);
+            ImGui::SliderFloat3("ModelPos", glm::value_ptr(mCurrentSelectedModel->translationVec), -15.0f, 15.0f, NULL);
             ImGui::SliderFloat3("ModelRot", glm::value_ptr(mCurrentSelectedModel->rotationVec), 0.0f, 6.28f, NULL);
             ImGui::SliderFloat3("ModelScale", glm::value_ptr(mCurrentSelectedModel->scaleVec), 0.001f, 10.0f, NULL);
-            ImGui::SliderFloat3("LightPos", glm::value_ptr(camera->lightPos), -5.0f, 5.0f, NULL);
+            
 
 
 
@@ -191,7 +208,6 @@ void Engine::renderImGui()
 
 
             //ImGuiColorEditFlags_PickerHueWheel
-            ImGui::ColorPicker3("lightColor", glm::value_ptr(camera->lightColor), ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_NoAlpha);
             ImGui::Text("Selected Model Material");
             ImGui::SliderFloat3("Ambient", glm::value_ptr(mCurrentSelectedModel->material.ambient), 0.0f, 10.0f, NULL);
             ImGui::SliderFloat3("Diffuse", glm::value_ptr(mCurrentSelectedModel->material.diffuse), 0.0f, 10.0f, NULL);
@@ -207,7 +223,7 @@ void Engine::renderImGui()
             Model* cModel = nullptr;
             try {
                 cModel = new Model("models/" + model_path, "textures/" + texture_path);
-                GenerateUUID(cModel, 8, true);
+                util::GenerateUUID(cModel, 8, true);
                 loadModel(cModel);
                 createTextureImage(cModel);
                 createTextureImageView(cModel);
@@ -237,7 +253,7 @@ void Engine::renderImGui()
                 }
 
             }
-            shouldDestroy = true;
+            state = STATE_DESTROY_OBJECT;
 
             scene.resize(0);
             for (size_t i = 0; i < newScene.size(); i++)
@@ -349,41 +365,25 @@ void Engine::renderImGui()
             ImGui::EndTable();
         }
         ImGui::EndTabItem();
+        
     }
+    if (ImGui::BeginTabItem("Settings"))
+    {
+        
+        if (ImGui::Checkbox("Enable Vertical Sync", &VSync))
+        {
+            swapChainConfigChanged = true;
+            // can add expand vsync options here
+        }
+        
+        ImGui::EndTabItem();
+    }
+    
     ImGui::EndTabBar();
     ImGui::End();
 
     if (true)
     {
-
-        if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
-        {
-            mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-        }
-        if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
-        {
-            mCurrentGizmoOperation = ImGuizmo::ROTATE;
-        }
-        if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS)
-        {
-            mCurrentGizmoOperation = ImGuizmo::SCALE;
-        }
-        if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
-        {
-            mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
-        }
-        if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && lockPipeline) // shity lock technique
-        {
-            lockPipeline = false;
-            currentPipeline = (currentPipeline + 1) % graphicsPipelines.size();
-            printf("\r%d", currentPipeline);
-        }
-        if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE)
-        {
-            lockPipeline = true;
-        }
-
-
         ImGuizmo::SetOrthographic(true);
         ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
@@ -395,7 +395,7 @@ void Engine::renderImGui()
             if (ImGuizmo::IsUsing())
             {
                 glm::vec3 translation, rotation, scale;
-                DecomposeTransform(mCurrentSelectedModel->transform, translation, rotation, scale);
+                util::DecomposeTransform(mCurrentSelectedModel->transform, translation, rotation, scale);
                 mCurrentSelectedModel->translationVec = translation;
                 mCurrentSelectedModel->rotationVec = rotation;
                 mCurrentSelectedModel->scaleVec = scale;
@@ -407,7 +407,7 @@ void Engine::renderImGui()
             if (ImGuizmo::IsUsing())
             {
                 glm::vec3 translation, rotation, scale;
-                DecomposeTransform(camera->lightMat, translation, rotation, scale);
+                util::DecomposeTransform(camera->lightMat, translation, rotation, scale);
                 camera->lightPos = translation;
 
             }

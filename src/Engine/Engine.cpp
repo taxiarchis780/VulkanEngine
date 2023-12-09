@@ -16,10 +16,8 @@ static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     engine->framebufferResized = true;
 }
 
-
 void Engine::run()
 {
-     
     initWindow();
     initVulkan();
     if (enableimGUI)
@@ -38,6 +36,7 @@ Engine::Engine(uint32_t width, uint32_t height, char* title, char* version)
     TITLE = title;
     VERSION = version;
     
+    
 }
 
 void Engine::initWindow()
@@ -53,12 +52,13 @@ void Engine::initWindow()
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
     glfwSetWindowUserPointer(window, (void*)this);
     glfwSetMouseButtonCallback(window, mouse_callback);
-    glfwSetWindowUserPointer(window, this);
+    glfwSetKeyCallback(window, key_callback);
     glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 }
 
 void Engine::initVulkan()
 {
+    
     createInstance();
     setupDebugMessenger();
     createSurface();
@@ -68,29 +68,35 @@ void Engine::initVulkan()
     createImageViews();
     createRenderPass();
     createDescriptorSetLayout();
-    
-    createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/shader_frag.spv");
-    createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/depth_frag.spv");
-    createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/laocoon_frag.spv");
-    
-    
+
     createCommandPool();
     createColorResources();
     createDepthResources();
     createFramebuffers();
-    if(firstScene)
+
+    if (firstScene)
         scene_path = "main.json";
     camera = new Camera(swapChainExtent.width, swapChainExtent.height);
     loadScene();
     loadFile(scene_path);
 
+    loadShaders();
+
+    scene[0]->NORMAL_PATH = std::string("textures/Laocoon-normals.jpg");
+
     for (size_t i = 0; i < sceneSize; ++i)
     {
+        if (!scene[i]->NORMAL_PATH.empty())
+        {
+            createDescriptorSetLayoutForModel(scene[i]);
+        }
+
         createTextureImage(scene[i]);
         createTextureImageView(scene[i]);
         createTextureSampler(scene[i]);
+        createNormal(scene[i]);
         createVertexBuffer(scene[i]);
-        createIndexBuffer(scene[i]); 
+        createIndexBuffer(scene[i]);
         createUniformBuffers(scene[i]);
         createDescriptorPool(scene[i]);
         createDescriptorSets(scene[i]);
@@ -101,10 +107,11 @@ void Engine::initVulkan()
 
     createCommandBuffers();
     createSyncObjects();
+
+    audioMgr = new Audio();
+
+    //physicsEngine = new PhysicsEngine(); // Project on hold
 }
-
-
-
 
 void Engine::recreateSwapChain()
 {
@@ -127,6 +134,9 @@ void Engine::recreateSwapChain()
     createColorResources();
     createDepthResources();
     createFramebuffers();
+
+
+
 }
 
 void Engine::cleanupSwapChain()
@@ -152,23 +162,36 @@ void Engine::cleanupSwapChain()
 
 void Engine::mainLoop()
 {
+    
+    std::thread fmodThread(fmod_update, window);
+
     while(!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
         drawWindowTitle();
+
+        if (VSync) // kinda broken // when turning back on performance is lost and noticeable screen tearing occurs
+        {
+            camera->UpdateInputs(window);
+            drawFrame();
+            continue;
+        }
+
         double currentTime = glfwGetTime(); // shitty implementation of dt
         double deltaTime = currentTime - lastTime1;
         
-        if (deltaTime >= 0.016) // update every 16 ms (updates 60 times per second)
-        {
-            camera->UpdateInputs(window);           
+        //std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        if (deltaTime >= 0.01666666666) // 60 ticks per second
+        {   
+            camera->UpdateInputs(window);
+            //physicsEngine->Update(); // project on hold
+            
             lastTime1 = currentTime;
         }
-        
+           
         drawFrame();
-        
-        
     }
+    fmodThread.join();
     vkDeviceWaitIdle(device);
 }
 
@@ -181,11 +204,12 @@ void Engine::createInstance()
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Engine Application";
-    appInfo.applicationVersion = VK_MAKE_VERSION(0, 0, 1);
+    appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
     appInfo.pEngineName = "No Engine";
-    appInfo.engineVersion = VK_MAKE_VERSION(0, 0, 1);
+    appInfo.engineVersion = VK_MAKE_API_VERSION(0, 0, 1, 0);
     appInfo.apiVersion = VK_API_VERSION_1_3;
-
+    
+    
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
@@ -280,6 +304,9 @@ VkSurfaceFormatKHR Engine::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFo
 
 VkPresentModeKHR Engine::chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes)
 {
+    if (VSync)
+        return VK_PRESENT_MODE_FIFO_KHR;
+    
     for(const auto& availablePresentMode : availablePresentModes)
     {
         if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) { return availablePresentMode; }
@@ -358,6 +385,7 @@ void Engine::createSwapChain()
     SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+    
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
     
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
@@ -538,18 +566,20 @@ void Engine::createRenderPass()
 
 void Engine::createGraphicsPipelineWrapper(std::string vertShaderPath, std::string fragShaderPath)
 {
-    createGraphicsPipeline(graphicsPipelines.size(), vertShaderPath, fragShaderPath);
+    createGraphicsPipeline(static_cast<int>(graphicsPipelines.size()), vertShaderPath, fragShaderPath);
 }
 
 void Engine::createGraphicsPipeline(int index,std::string vertShaderPath, std::string fragShaderPath){
-    //auto vertShaderCode = readFile("res/shaders/vert.spv");
-    auto vertShaderCode = readFile(vertShaderPath);
-    //auto fragShaderCode = readFile("res/shaders/frag.spv");
-    auto fragShaderCode = readFile(fragShaderPath);
+    auto vertShaderCode = util::readFile(vertShaderPath);
+    auto fragShaderCode = util::readFile(fragShaderPath);
 
+    //auto tesselationControlShaderCode = util::readFile("res/shaders/tesselation_control.spv");
+    //auto tesselationEvalShaderCode = util::readFile("res/shaders/tesselation_eval.spv");
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+    //VkShaderModule tesselationControlModule = createShaderModule(tesselationControlShaderCode);
+    //VkShaderModule tesselationEvalModule = createShaderModule(tesselationEvalShaderCode);
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -563,7 +593,25 @@ void Engine::createGraphicsPipeline(int index,std::string vertShaderPath, std::s
     fragShaderStageInfo.module = fragShaderModule;
     fragShaderStageInfo.pName = "main";
 
+    /*
+    VkPipelineShaderStageCreateInfo tesselationControlShaderStageInfo{};
+    tesselationControlShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    tesselationControlShaderStageInfo.stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+    tesselationControlShaderStageInfo.module = tesselationControlModule;
+    tesselationControlShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo tesselationEvalShaderStageInfo{};
+    tesselationEvalShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    tesselationEvalShaderStageInfo.stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+    tesselationEvalShaderStageInfo.module = tesselationEvalModule;
+    tesselationEvalShaderStageInfo.pName = "main";
+   
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, tesselationControlShaderStageInfo, tesselationEvalShaderStageInfo, fragShaderStageInfo};
+    */
+
     VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+   
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -637,7 +685,7 @@ void Engine::createGraphicsPipeline(int index,std::string vertShaderPath, std::s
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-
+    
     pipelineLayouts.resize(pipelineLayouts.size() + 1);
     pipelineLayouts[index] = VkPipelineLayout();
 
@@ -775,46 +823,21 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
 
     for (size_t i = 0; i < scene.size(); ++i)
     {
-        if (mCurrentSelectedModel == scene[i])
-            continue;
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &scene[i]->vertexBuffer, offsets);
-
-        vkCmdBindIndexBuffer(commandBuffer, scene[i]->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts[currentPipeline], 0, 1, &scene[i]->descriptorSets[currentFrame], 0, nullptr);
-
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(scene[i]->indices.size()), 1, 0, 0, 0);
-    }
-
-    if(mCurrentSelectedModel != nullptr) // draw with different shader
-    {
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[2]);
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mCurrentSelectedModel->vertexBuffer, offsets);
-
-        vkCmdBindIndexBuffer(commandBuffer, mCurrentSelectedModel->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts[currentPipeline], 0, 1, &mCurrentSelectedModel->descriptorSets[currentFrame], 0, nullptr);
-
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mCurrentSelectedModel->indices.size()), 1, 0, 0, 0);
-    }
-
-    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS && !LockImGui)
-    {
-        enableimGUI = !enableimGUI;
-        if (enableimGUI)
+        scene[i]->pipelineIndex = currentPipeline;
+        if (scene[i] == mCurrentSelectedModel)
         {
-            io.ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+            if (2 < graphicsPipelines.size())
+            {
+                vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[2]);
+                scene[i]->pipelineIndex = 2;
+            }
+            Draw(scene[i], commandBuffer, pipelineLayouts[scene[i]->pipelineIndex], currentFrame);
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelines[currentPipeline]);
+            continue;
         }
-        else {
-            io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
-        }
-        LockImGui = true;
-    }
-    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_RELEASE)
-    {
-        LockImGui = false;
-    }
 
+        Draw(scene[i], commandBuffer, pipelineLayouts[scene[i]->pipelineIndex], currentFrame);
+    }
 
     if (enableimGUI)
     {
@@ -830,6 +853,19 @@ void Engine::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIn
 
 }
 
+void Engine::Draw(Model* cModel, VkCommandBuffer commandBuffer, VkPipelineLayout graphicsPipelineLayout, int currentFrame)
+{
+    VkDeviceSize offsets[] = { 0 };
+
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &cModel->vertexBuffer, offsets);
+
+    vkCmdBindIndexBuffer(commandBuffer, cModel->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout, 0, 1, &cModel->descriptorSets[currentFrame], 0, nullptr);
+
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(cModel->indices.size()), 1, 0, 0, 0);
+}
+
 
 
 void Engine::mouse_callback(GLFWwindow* window, int button, int action, int mods)
@@ -842,19 +878,119 @@ void Engine::mouse_callback(GLFWwindow* window, int button, int action, int mods
     {
         case GLFW_MOUSE_BUTTON_2:
         {
-            int index = engine->camera->pickModel(engine->scene, window);
+            // Basically select a model by click if it is already selected deselect it.
+            int index = engine->camera->pickModel(engine->scene, window); 
             if (index != -1 && engine->camera->LockCamera)
             {
-                engine->mCurrentSelectedModel = engine->scene[index];
+                if (engine->scene[index] == engine->mCurrentSelectedModel && engine->mCurrentSelectedModel != nullptr)
+                {
+                    engine->mCurrentSelectedModel = nullptr;
+                }
+                else {
+                    engine->mCurrentSelectedModel = engine->scene[index];
+                }
             }
-        }
-        break;
-        case GLFW_MOUSE_BUTTON_3: // test
-        {
-            printf("Hellow MB3");
         }break;
+        
+        break;        
         default:
             break;
+    }
+    
+}
+
+
+void Engine::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    Engine* engine = reinterpret_cast<Engine*>(glfwGetWindowUserPointer(window));
+
+    if (ImGui::GetIO().WantCaptureKeyboard)
+    {
+        return;
+    }
+
+    if (action == GLFW_RELEASE)
+    {
+        switch (key)
+        {
+            case GLFW_KEY_K:
+            {
+                engine->camera->firstClick = false;
+            }break;
+        default:
+            break;
+        }
+    }
+
+    if (action == GLFW_PRESS)
+    {
+        switch (key)
+        {
+            case GLFW_KEY_O: // The physics development is put on hold for now will get back to it once I am mentally ok since physx makes everything 10 times worse
+            {
+                //physx::PxMat44 mat = glmMat4ToPhysxMat4(engine->mCurrentSelectedModel->transform);
+                //engine->physicsEngine->addPhysicsObj(engine->mCurrentSelectedModel, true, mat);
+                
+            }break;
+            case GLFW_KEY_J:
+            {
+                //engine->physicsEngine->applyForceToRigidBody(engine->scene[3]);
+            }break;
+            case GLFW_KEY_I:
+            {
+                //engine->physicsEngine->addColision(engine->scene[3], engine->scene[3]->transform, false);
+
+            }break;
+            case GLFW_KEY_N:
+            {
+              
+            }break;
+            case GLFW_KEY_P:
+            {
+            
+                engine->currentPipeline = (engine->currentPipeline + 1) % engine->graphicsPipelines.size();
+                printf("\r%d", engine->currentPipeline);
+
+            }break;
+            case GLFW_KEY_ESCAPE:
+            {
+                glfwSetWindowShouldClose(window, true);
+            }break;
+            case GLFW_KEY_K:
+            {
+                engine->enableimGUI = !engine->enableimGUI;
+                if (engine->enableimGUI)
+                {
+                    engine->io.ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+                }
+                else {
+                    engine->io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+                }
+            
+                engine->camera->LockCamera = !engine->camera->LockCamera;
+                engine->camera->firstClick = true;
+        
+            }break;
+            case GLFW_KEY_T:
+            {
+                engine->mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+            }break;
+            case GLFW_KEY_R:
+            {
+                engine->mCurrentGizmoOperation = ImGuizmo::ROTATE;
+            }break;
+            case GLFW_KEY_Y:
+            {
+                engine->mCurrentGizmoOperation = ImGuizmo::SCALE;
+            }break;
+            case GLFW_KEY_U:
+            {
+                engine->mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+            }break;
+        
+            default:
+                break;
+            }
     }
     
 }
@@ -883,59 +1019,7 @@ void Engine::drawFrame()
 {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
-
-    if (shouldDestroy && scene.size())
-    {
-        vkQueueWaitIdle(graphicsQueue);
-        cleanUpModel(mCurrentSelectedModel);
-        mCurrentSelectedModel = scene.back();
-    }
-    if (shouldResetScene && (scene.size() || strcmp(scene_path.c_str(), "res/data/empty.json")))
-    {
-        
-        vkQueueWaitIdle(graphicsQueue);
-        for (auto& cModel : scene)
-        {
-            cleanUpModel(cModel);
-            statsFaces -= cModel->statsFaces;
-        }
-        mCurrentSelectedModel = nullptr; 
-        scene.resize(0);
-        shouldResetScene = false;
-
-        loadScene();
-        loadFile(scene_path);
-        for (size_t i = 0; i < sceneSize; ++i)
-        {
-            createTextureImage(scene[i]);
-            createTextureImageView(scene[i]);
-            createTextureSampler(scene[i]);
-            createVertexBuffer(scene[i]);
-            createIndexBuffer(scene[i]);
-            createUniformBuffers(scene[i]);
-            createDescriptorPool(scene[i]);
-            createDescriptorSets(scene[i]);
-        }
-    }
-    if (shouldUpdatePipeline)
-    {
-        vkQueueWaitIdle(graphicsQueue);
-        for (auto& pipeline : graphicsPipelines)
-        {
-            vkDestroyPipeline(device, pipeline, nullptr);
-        }
-        for (auto& pipelineLayout : pipelineLayouts)
-        {
-            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        }
-        graphicsPipelines.resize(0); // reset sizes
-        pipelineLayouts.resize(0); 
-        createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/shader_frag.spv");
-        createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/depth_frag.spv");
-        createGraphicsPipelineWrapper("res/shaders/shader_vert.spv", "res/shaders/laocoon_frag.spv");
-        shouldUpdatePipeline = false;
-    }
-    
+    processState();
 
     uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -957,10 +1041,6 @@ void Engine::drawFrame()
             updateUniformBuffers(currentFrame, scene[i]);
         }
     }
-    
-
-    
-    
     
     recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
     
@@ -999,10 +1079,11 @@ void Engine::drawFrame()
     presentInfo.pImageIndices = &imageIndex;
 
     result = vkQueuePresentKHR(presentQueue, &presentInfo);
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
+    
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized || swapChainConfigChanged)
     {
         framebufferResized = false;
+        swapChainConfigChanged = false;
         recreateSwapChain();
     } 
     else if (result  != VK_SUCCESS) {
@@ -1011,6 +1092,75 @@ void Engine::drawFrame()
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
+}
+
+void Engine::processState()
+{
+    switch (state)
+    {
+    case STATE_DESTROY_OBJECT:
+    {
+        if (!scene.size())
+        {
+            printf("INFO: There is nothing to destroy!");
+            state = STATE_NOP;
+            break;
+        }
+        vkQueueWaitIdle(graphicsQueue);
+        cleanUpModel(mCurrentSelectedModel);
+        mCurrentSelectedModel = scene.back();
+        state = STATE_NOP;
+    }break;
+    case STATE_RESET_SCENE:
+    {
+        if (scene.size() || strcmp(scene_path.c_str(), "res/data/system/empty.json"))
+        {
+
+            vkQueueWaitIdle(graphicsQueue);
+            for (auto& cModel : scene)
+            {
+                cleanUpModel(cModel);
+                statsFaces -= cModel->statsFaces;
+            }
+            mCurrentSelectedModel = nullptr;
+            scene.resize(0);
+            shader_indices.resize(0);
+            shader_paths.resize(0);
+            loadScene();
+            loadFile(scene_path);
+            for (size_t i = 0; i < sceneSize; ++i)
+            {
+                createTextureImage(scene[i]);
+                createTextureImageView(scene[i]);
+                createTextureSampler(scene[i]);
+                createVertexBuffer(scene[i]);
+                createIndexBuffer(scene[i]);
+                createUniformBuffers(scene[i]);
+                createDescriptorPool(scene[i]);
+                createDescriptorSets(scene[i]);
+            }
+        }
+        state = STATE_UPDATE_PIPELINE;
+    }break;
+    case STATE_UPDATE_PIPELINE:
+    {
+        vkQueueWaitIdle(graphicsQueue);
+        for (auto& pipeline : graphicsPipelines)
+        {
+            vkDestroyPipeline(device, pipeline, nullptr);
+        }
+        for (auto& pipelineLayout : pipelineLayouts)
+        {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        }
+        graphicsPipelines.resize(0); // reset sizes
+        pipelineLayouts.resize(0);
+        loadShaders();
+        state = STATE_NOP;
+    }break;
+    case STATE_NOP: break;
+    default: break;
+    }
 }
 
 void Engine::createVertexBuffer(Model* model) // investigage if Vertexbuffermemory must be unique
@@ -1073,6 +1223,32 @@ uint32_t Engine::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags prope
     throw std::runtime_error("ERROR: failed to find suitable memory type!");
 }
 
+void Engine::createDescriptorSetLayoutForModel(Model* model)
+{
+    VkDescriptorSetLayoutBinding uboLayoutBinding{};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &model->descriptorSetLayout) != VK_SUCCESS)
+        throw std::runtime_error("ERROR: failed to create descriptor set layout!");
+}
+
 void Engine::createDescriptorSetLayout()
 {
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
@@ -1116,8 +1292,12 @@ void Engine::createUniformBuffers(Model* model)
 
 void Engine::updateUniformBuffers(uint32_t currentImage, Model* model)
 {
-    
-    camera->UpdateMatrices(FOV, model);
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    camera->UpdateMatrices(model);
 
     UniformBufferObject ubo{};
     ubo.transform = model->transform;
@@ -1127,6 +1307,7 @@ void Engine::updateUniformBuffers(uint32_t currentImage, Model* model)
     ubo.lightPos = camera->lightPos;
     ubo.lightColor = camera->lightColor;
     ubo.material = model->material;
+    ubo.time = time;
     ubo.proj[1][1] *= -1;
 
     memcpy(model->uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
@@ -1151,6 +1332,7 @@ void Engine::createDescriptorPool(Model* model)
         throw std::runtime_error("failed to create descriptor pool!");
     }
 }
+
 
 
 
@@ -1212,7 +1394,7 @@ void Engine::createTextureImage(Model* model)
 
     if (!pixels)
     {
-        throw std::runtime_error("ERROR failed to load texture image!");
+        throw std::runtime_error("ERROR: failed to load texture image!");
     }
 
     VkBuffer stagingBuffer;
@@ -1233,6 +1415,73 @@ void Engine::createTextureImage(Model* model)
 
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
+void Engine::createNormal(Model* cModel)
+{
+    
+    if (cModel->NORMAL_PATH.empty()) // check if model has a normal texture assigned to it
+        return;
+
+    // Create Normal Image
+    int norWidth, norHeight, norChannels;
+    stbi_uc* pixels = stbi_load((cModel->baseDir + cModel->NORMAL_PATH).c_str(), &norWidth, &norHeight, &norChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = norWidth * norHeight * 4; // 4 channels
+    
+    if (!pixels)
+    {
+        throw std::runtime_error("ERROR: failed to load normal image!");
+    }
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+    void* data;
+    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingBufferMemory);
+    stbi_image_free(pixels);
+
+    createImage(norWidth, norHeight, cModel->mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, cModel->normalImage, cModel->normalImageMemory);
+    transitionImageLayout(cModel->normalImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cModel->mipLevels);
+    copyBufferToImage(stagingBuffer, cModel->normalImage, static_cast<uint32_t>(norWidth), static_cast<uint32_t>(norHeight));
+    generateMipmaps(cModel->normalImage, VK_FORMAT_R8G8B8A8_SRGB, norWidth, norHeight, cModel->mipLevels);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+    // Create Normal Image View
+    cModel->normalImageView = createImageView(cModel->normalImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, cModel->mipLevels);
+
+    // Create Normal Image Sampler
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &cModel->normalSampler) != VK_SUCCESS)
+    {
+        throw std::runtime_error("ERROR: failed to create normal sampler!");
+    }
 }
 
 void Engine::createColorResources() {
@@ -1465,6 +1714,8 @@ void Engine::createTextureSampler(Model* model)
     }
 }
 
+
+
 VkImageView Engine::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels)
 {
     VkImageViewCreateInfo viewInfo{};
@@ -1526,7 +1777,7 @@ bool Engine::hasStencilComponent(VkFormat format)
 
 void Engine::loadFile(std::string filename)
 {
-    std::ifstream f{"res/data/" + filename};
+    std::ifstream f{"res/data/user/" + filename};
     json j = json::parse(f);
 
     for (size_t i = 0; i < sceneSize; ++i)
@@ -1541,6 +1792,17 @@ void Engine::loadFile(std::string filename)
     camera->Orientation = glm::vec3(j["Section3"]["CameraInfo"]["CameraOrientation"][0][0], j["Section3"]["CameraInfo"]["CameraOrientation"][0][1], j["Section3"]["CameraInfo"]["CameraOrientation"][0][2]);
     camera->lightPos = glm::vec3(j["Section3"]["LightInfo"]["LightPos"][0][0], j["Section3"]["LightInfo"]["LightPos"][0][1], j["Section3"]["LightInfo"]["LightPos"][0][2]);
     camera->lightColor = glm::vec3(j["Section3"]["LightInfo"]["LightColor"][0][0], j["Section3"]["LightInfo"]["LightColor"][0][1], j["Section3"]["LightInfo"]["LightColor"][0][2]);
+    
+    shader_paths = j["Section4"]["ShaderPaths"];
+    shader_indices = j["Section4"]["ShaderIndices"];
+}
+
+void Engine::loadShaders()
+{
+    for (int i = 0; i < shader_indices.size(); i++)
+    {
+        createGraphicsPipelineWrapper(shader_paths[shader_indices[i][0]], shader_paths[shader_indices[i][1]]);
+    }
 }
 
 void Engine::writeToFile(std::vector<Model*> scene)
@@ -1574,7 +1836,7 @@ void Engine::writeToFile(std::vector<Model*> scene)
     }
     if (willNotReturn)
         return;
-    std::ofstream f("res/data/" + scene_path);
+    std::ofstream f("res/data/user/" + scene_path);
     json j;
 
     for (size_t i = 0; i < scene.size(); ++i)
@@ -1594,6 +1856,15 @@ void Engine::writeToFile(std::vector<Model*> scene)
     j["Section3"]["LightInfo"]["LightPos"].push_back({ json::number_float_t(camera->lightPos.x), json::number_float_t(camera->lightPos.y), json::number_float_t(camera->lightPos.z) });
     j["Section3"]["LightInfo"]["LightColor"].push_back({ json::number_float_t(camera->lightColor.x), json::number_float_t(camera->lightColor.y), json::number_float_t(camera->lightColor.z) });
     
+    for (auto& shader_path : shader_paths)
+    {
+        j["Section4"]["ShaderPaths"].push_back(shader_path);
+    }
+    for (auto& shader_index : shader_indices)
+    {
+        j["Section4"]["ShaderIndices"].push_back(shader_index);
+    }
+
     f << std::setw(4) << j << std::endl;
 }
 
@@ -1675,7 +1946,7 @@ void Engine::traceDir(std::string modelDirectory, std::string textureDirectory)
         {
             std::string outfilename_str = outfilename.string();
 
-            model_paths.push_back(clear_slash(outfilename_str));
+            model_paths.push_back(util::clear_slash(outfilename_str));
         }
     }
     for (const auto& entry : std::filesystem::directory_iterator(textureDirectory))
@@ -1685,22 +1956,22 @@ void Engine::traceDir(std::string modelDirectory, std::string textureDirectory)
         {
             std::string outfilename_str = outfilename.string();
     
-            texture_paths.push_back(clear_slash(outfilename_str));
+            texture_paths.push_back(util::clear_slash(outfilename_str));
         }
     }
 }
 
-void Engine::traceScenesDir(std::string sceneDirectory)
+void Engine::findFiles(std::string sceneDirectory, std::string fileExtension)
 {
     
     scene_paths.resize(0);
     for (const auto& entry : std::filesystem::directory_iterator(sceneDirectory))
     {
         std::filesystem::path outfilename = entry.path();
-        if (outfilename.extension() == ".json")
+        if (outfilename.extension() == fileExtension)
         {
             std::string outfilename_str = outfilename.string();
-            scene_paths.push_back(clear_slash(outfilename_str));
+            scene_paths.push_back(util::clear_slash(outfilename_str));
         }
     }
 }
@@ -1731,7 +2002,7 @@ void Engine::drawWindowTitle()
     if (delta >= 1.0)
     {
         double timeToDraw = 1000.0 / double(nbFrames);
-        double fps = double(nbFrames) / delta;
+        fps = double(nbFrames) / delta;
         std::stringstream ss;
         ss << TITLE << " " << VERSION << " [" << fps << " FPS]" << " [" << timeToDraw << "ms  Frametime ]" << "[ TRIANGLES COUNT: " << statsFaces << " ]";
 
@@ -1746,7 +2017,8 @@ void Engine::drawWindowTitle()
 void Engine::loadScene()
 {
     scene.resize(0);
-    std::ifstream f{"res/data/" + scene_path};
+    std::ifstream f{"res/data/user/" + scene_path};
+    
     json j = json::parse(f);
     sceneSize = j["Section1"]["UUIDs"].size();
     for (size_t i = 0; i < sceneSize; ++i)
@@ -1765,9 +2037,7 @@ void Engine::loadScene()
 
 void Engine::resetScene()
 {
-    
-    shouldResetScene = true;
-    
+    state = STATE_RESET_SCENE;
 }
 
 void Engine::addtoScene(Model* model)
@@ -1784,6 +2054,15 @@ void Engine::cleanUpModel(Model* model)
     for (auto& mem : model->uniformBuffersMemory)
         vkFreeMemory(device, mem, nullptr);
     vkDestroyDescriptorPool(device, model->descriptorPool, nullptr);
+    if (!model->NORMAL_PATH.empty())
+    {
+        vkDestroySampler(device, model->normalSampler, nullptr);
+        vkDestroyImageView(device, model->normalImageView, nullptr);
+        vkDestroyImage(device, model->normalImage, nullptr);
+        vkFreeMemory(device, model->normalImageMemory, nullptr);
+        vkDestroyDescriptorSetLayout(device, model->descriptorSetLayout, nullptr);
+    }
+
     vkDestroySampler(device, model->textureSampler, nullptr);
     vkDestroyImageView(device, model->textureImageView, nullptr);
     vkDestroyImage(device, model->textureImage, nullptr);
@@ -1795,7 +2074,21 @@ void Engine::cleanUpModel(Model* model)
     vkFreeMemory(device, model->indexBufferMemory, nullptr);
     free(model);
 
-    shouldDestroy = false;
+}
+
+
+void Engine::fmod_update(GLFWwindow* window)
+{
+    
+    static Engine* engine = static_cast<Engine*>(glfwGetWindowUserPointer(window));
+    if (engine->enableAudio)
+    {
+        while (!glfwWindowShouldClose(window))
+        {
+            engine->audioMgr->Update();
+        }
+    }
+    
 }
 
 void Engine::cleanup()
@@ -1803,8 +2096,14 @@ void Engine::cleanup()
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
+    physicsEngine->~PhysicsEngine();
+    delete physicsEngine;
     
-    free(camera);
+    audioMgr->~Audio();
+    delete audioMgr;
+
+    delete camera;
 
     cleanupSwapChain();
 
@@ -1830,7 +2129,7 @@ void Engine::cleanup()
     }
     vkDestroyRenderPass(device, renderPass, nullptr);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) { // destroy sync Objects
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
         vkDestroyFence(device, inFlightFences[i], nullptr);

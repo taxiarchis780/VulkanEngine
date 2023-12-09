@@ -1,5 +1,5 @@
-#ifndef __ENTITY_CLASS_H__
-#define __ENTITY_CLASS_H__
+#ifndef __ENTITY_CLASS__
+#define __ENTITY_CLASS__
 #include <Model.h>
 
 
@@ -11,7 +11,6 @@ public:
 	
 	~Entity();
 private:
-	Model* model;
 };
 
 

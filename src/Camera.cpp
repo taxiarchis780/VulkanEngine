@@ -7,13 +7,21 @@ Camera::Camera(float Winwidth, float Winheight)
 	height = Winheight;
 }
 
-void Camera::UpdateMatrices(float FOV, Model* Model) 
+void Camera::UpdateMatrices(Model* Model) 
 {
 	model = glm::mat4(1.0f);
 	glm::mat4 scaleMat = glm::scale(Model->scaleVec);
-	//if (Model->UUID == "laocoon" && Model->translationVec.z >= 0.0f)
-	//	Model->translationVec.z -= 0.001;
+	/*
+	if (Model->UUID == "Laocoon" && Model->translationVec.z >= 0.0f)
+	{
+		//Model->translationVec.z -= 0.001;
+		
+		glm::quat quaternion = glm::quatLookAt(Model->rotationVec/glm::length(Model->rotationVec), Up);
+		printf("\r X: %.1f, Y: %.1f, Z: %.1f, W: %.1f", quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+	}*/
+
 	glm::mat4 translateMat = glm::translate(glm::mat4(1.0f), Model->translationVec);
+	
 	glm::mat4 rotMat = glm::mat4(1.0f);
 	rotMat *= glm::rotate(glm::mat4(1.0f), Model->rotationVec.z, glm::vec3(0.0f, 0.0f, 1.0f));
 	rotMat *= glm::rotate(glm::mat4(1.0f), Model->rotationVec.y, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -70,22 +78,6 @@ int Camera::pickModel(std::vector<Model*> scene, GLFWwindow* window)
 
 void Camera::UpdateInputs(GLFWwindow* window)
 {
-	
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-	{
-		glfwSetWindowShouldClose(window, true);
-	}
-	if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS && !LockKey)
-	{
-		LockCamera = !LockCamera;
-		firstClick = true;
-		LockKey = true;
-	}
-	if (glfwGetKey(window, GLFW_KEY_K) == GLFW_RELEASE)
-	{
-		LockKey = false;
-		firstClick = false;
-	}
 	
 	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS || glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
 	{

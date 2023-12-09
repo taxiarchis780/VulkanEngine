@@ -124,6 +124,8 @@ int Engine::rateDeviceSuitability(VkPhysicalDevice device)
         }
     }
 
+    score += (deviceProperties.limits.maxVertexInputAttributes + deviceProperties.limits.maxFragmentInputComponents) * 100;
+
     return score;
 
 }
