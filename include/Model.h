@@ -43,7 +43,7 @@ public:
 	std::string UUID = std::string("");
 	std::string baseDir = "res/";
 	glm::mat4 transform;
-	Model(std::string MODEL_PATH, std::string TEXTTURE_PATH);
+	Model(std::string MODEL_PATH, std::string TEXTURE_PATH);
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 	
@@ -81,6 +81,7 @@ public:
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 	std::vector<void*> uniformBuffersMapped;
+
 private:
 	
 };

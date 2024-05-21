@@ -7,12 +7,24 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VulkanProject", "VulkanProj
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Build Lib|x64 = Build Lib|x64
+		Build Lib|x86 = Build Lib|x86
+		Build No ValidationLayers|x64 = Build No ValidationLayers|x64
+		Build No ValidationLayers|x86 = Build No ValidationLayers|x86
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Build Lib|x64.ActiveCfg = Build Lib|x64
+		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Build Lib|x64.Build.0 = Build Lib|x64
+		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Build Lib|x86.ActiveCfg = Build Lib|Win32
+		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Build Lib|x86.Build.0 = Build Lib|Win32
+		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Build No ValidationLayers|x64.ActiveCfg = Build No ValidationLayers|x64
+		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Build No ValidationLayers|x64.Build.0 = Build No ValidationLayers|x64
+		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Build No ValidationLayers|x86.ActiveCfg = Build No ValidationLayers|Win32
+		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Build No ValidationLayers|x86.Build.0 = Build No ValidationLayers|Win32
 		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Debug|x64.ActiveCfg = Debug|x64
 		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Debug|x64.Build.0 = Debug|x64
 		{29791A8C-6183-47EC-9AC7-CE683F1686C5}.Debug|x86.ActiveCfg = Debug|Win32

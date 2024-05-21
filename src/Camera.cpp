@@ -9,6 +9,7 @@ Camera::Camera(float Winwidth, float Winheight)
 
 void Camera::UpdateMatrices(Model* Model) 
 {
+	//Model->Update();
 	model = glm::mat4(1.0f);
 	glm::mat4 scaleMat = glm::scale(Model->scaleVec);
 	/*
@@ -18,11 +19,12 @@ void Camera::UpdateMatrices(Model* Model)
 		
 		glm::quat quaternion = glm::quatLookAt(Model->rotationVec/glm::length(Model->rotationVec), Up);
 		printf("\r X: %.1f, Y: %.1f, Z: %.1f, W: %.1f", quaternion.x, quaternion.y, quaternion.z, quaternion.w);
-	}*/
+	}
+	*/
 
 	glm::mat4 translateMat = glm::translate(glm::mat4(1.0f), Model->translationVec);
-	
 	glm::mat4 rotMat = glm::mat4(1.0f);
+
 	rotMat *= glm::rotate(glm::mat4(1.0f), Model->rotationVec.z, glm::vec3(0.0f, 0.0f, 1.0f));
 	rotMat *= glm::rotate(glm::mat4(1.0f), Model->rotationVec.y, glm::vec3(0.0f, 1.0f, 0.0f));
 	rotMat *= glm::rotate(glm::mat4(1.0f), Model->rotationVec.x, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -76,8 +78,13 @@ int Camera::pickModel(std::vector<Model*> scene, GLFWwindow* window)
 	return -1;
 }
 
-void Camera::UpdateInputs(GLFWwindow* window)
+void Camera::UpdateInputs(GLFWwindow* window, std::function<void(GLFWwindow*,Camera*)> cameraFunction)
 {
+	if (cameraFunction)
+	{
+		cameraFunction(window, this);
+		return;
+	}
 	
 	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS || glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
 	{

@@ -6,10 +6,15 @@
 
 class Entity
 {
-public:
+public:	
 	Entity();
-	
 	~Entity();
+
+	glm::vec3 scaleVec = glm::vec3(1.0f);
+	glm::vec3 translationVec = glm::vec3(0.0f);
+	glm::vec3 rotationVec = glm::vec3(0.0f);
+	
+	
 private:
 };
 

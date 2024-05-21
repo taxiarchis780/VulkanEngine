@@ -6,6 +6,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 #include <vulkan/vulkan.h>
+#include <functional>
 /*
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
@@ -49,8 +50,8 @@ public:
 	Camera(float width, float height);
 
 	void UpdateMatrices(Model* model);
-	int pickModel(std::vector<Model*> scene, GLFWwindow* window);
-	void UpdateInputs(GLFWwindow* window);
+	int  pickModel(std::vector<Model*> scene, GLFWwindow* window);
+	void UpdateInputs(GLFWwindow* window, std::function<void(GLFWwindow*, Camera*)> cameraFunction = 0);
 	
 };
 

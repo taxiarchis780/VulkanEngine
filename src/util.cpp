@@ -152,4 +152,27 @@ namespace util
 		return true;
 	}
 
+
+	int findHighestElementIfNotUnique(const std::vector<int>& totalStrength)
+	{
+		if (totalStrength.empty())
+		{
+			return -1;
+		}
+
+		int max_value = *std::max_element(totalStrength.begin(), totalStrength.end());
+		int count_max = std::count(totalStrength.begin(), totalStrength.end(), max_value);
+
+		if (count_max == 1)
+		{
+			// The highest integer is unique
+			auto it = std::find(totalStrength.begin(), totalStrength.end(), max_value);
+			return std::distance(totalStrength.begin(), it);
+
+		}
+		else {
+			return -1;
+		}
+	}
+
 }

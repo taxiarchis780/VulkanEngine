@@ -47,9 +47,9 @@ void Engine::initImGui()
     info.ImageCount = MAX_FRAMES_IN_FLIGHT;
     info.MSAASamples = msaaSamples;
     ImGui_ImplVulkan_Init(&info, renderPass);
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands(&device, commandPool);
     ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-    endSingleTimeCommands(commandBuffer);
+    endSingleTimeCommands(&device, commandBuffer, commandPool, graphicsQueue);
     vkDeviceWaitIdle(device);
 
     ImGui_ImplVulkan_DestroyFontUploadObjects();
@@ -74,8 +74,8 @@ void Engine::renderImGui()
     ImGui::NewFrame();
 
     //ImGui::SetNextWindowPos(ImVec2(swapChainExtent.width - 735 , 0));
-    if (isComponentSelected) ImGui::SetNextWindowSize(ImVec2(427, swapChainExtent.height));
-    else ImGui::SetNextWindowSize(ImVec2(600, swapChainExtent.height));
+    if (isComponentSelected) ImGui::SetNextWindowSize(ImVec2(427, swapChainHandle.extent.height));
+    else ImGui::SetNextWindowSize(ImVec2(600, swapChainHandle.extent.height));
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::Begin("Main", 0, ImGuiWindowFlags_NoMove);
     ImGui::BeginTabBar("##TabBar");
@@ -134,7 +134,12 @@ void Engine::renderImGui()
             }
             if (ImGui::Button("LoadScene"))
             {
-                resetScene();
+                resetScene(ENGINE_LOAD_SCENE);
+            } ImGui::SameLine();
+            if (ImGui::Button("Delete Scene"))
+            {
+                
+                deleteFile(scene_path);
             }
             if (ImGui::Button("SaveToSelected"))
             {
@@ -147,8 +152,8 @@ void Engine::renderImGui()
             }
             if (ImGui::Button("New Scene"))
             {
-                scene_path = "res/data/empty.json";
-                resetScene();
+                scene_path = "res/data/system/empty.json";
+                resetScene(ENGINE_RESET_SCENE);
             }
         }
 
@@ -164,6 +169,11 @@ void Engine::renderImGui()
         if (ImGui::Button("Create Graphics Pipeline"))
         {
             createGraphicsPipelineWrapper(vert_path, frag_path);
+            shader_paths.push_back(vert_path);
+            shader_paths.push_back(frag_path);
+
+            shader_indices.push_back(std::vector<int>({ static_cast<int>(shader_paths.size() - 1), static_cast<int>(shader_paths.size()) }));
+
         }
         ImGui::SliderFloat3("LightPos", glm::value_ptr(camera->lightPos), -5.0f, 5.0f, NULL);
         ImGui::ColorPicker3("lightColor", glm::value_ptr(camera->lightColor), ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_NoAlpha);
@@ -370,10 +380,25 @@ void Engine::renderImGui()
     if (ImGui::BeginTabItem("Settings"))
     {
         
-        if (ImGui::Checkbox("Enable Vertical Sync", &VSync))
+        if (ImGui::Checkbox("Change Present Mode", &PresentModeChange) || PresentModeChange)
         {
-            swapChainConfigChanged = true;
-            // can add expand vsync options here
+            if(ImGui::BeginListBox("MODES", ImVec2(200, 160)))
+            {
+                
+                for (size_t i = 0; i < 4; ++i)
+                {
+                    const bool isSelected = (swapChainHandle.presentMode == i);
+                    if (ImGui::Selectable(presentModes[i], isSelected))
+                    {
+                        swapChainHandle.presentMode = (VkPresentModeKHR)i;
+                        swapChainConfigChanged = true;
+                        
+                    }
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndListBox();
+            }
         }
         
         ImGui::EndTabItem();
@@ -382,12 +407,12 @@ void Engine::renderImGui()
     ImGui::EndTabBar();
     ImGui::End();
 
-    if (true)
+    
     {
-        ImGuizmo::SetOrthographic(true);
+        ImGuizmo::SetOrthographic(false);
         ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
-        ImGuizmo::SetRect(0, 0, swapChainExtent.width, swapChainExtent.height);
+        ImGuizmo::SetRect(0, 0, swapChainHandle.extent.width, swapChainHandle.extent.height);
         if (!lightTranslateEnable && mCurrentSelectedModel != nullptr)
         {
             ImGuizmo::Manipulate(glm::value_ptr(camera->view), glm::value_ptr(camera->proj), mCurrentGizmoOperation, mCurrentGizmoMode, glm::value_ptr(mCurrentSelectedModel->transform));

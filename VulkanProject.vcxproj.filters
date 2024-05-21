@@ -25,11 +25,14 @@
     <Filter Include="Resource Files\textures">
       <UniqueIdentifier>{4debcf15-c925-420a-83ea-3e314533ea2d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Engine">
-      <UniqueIdentifier>{15df0eb7-805e-4f96-83b1-994a5d2c6eec}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\PhysicsEngine">
       <UniqueIdentifier>{ebbb96d0-2d82-4966-9652-70a044ebdc64}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Internal">
+      <UniqueIdentifier>{6c816dcd-0fe3-4983-9dbb-f47440c08f30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Internal">
+      <UniqueIdentifier>{15df0eb7-805e-4f96-83b1-994a5d2c6eec}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -61,22 +64,16 @@
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\Buffer.cpp">
-      <Filter>Source Files\Engine</Filter>
+      <Filter>Source Files\Internal</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\Debugger.cpp">
-      <Filter>Source Files\Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Engine\Device.cpp">
-      <Filter>Source Files\Engine</Filter>
+      <Filter>Source Files\Internal</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\Engine.cpp">
-      <Filter>Source Files\Engine</Filter>
+      <Filter>Source Files\Internal</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\GUI.cpp">
-      <Filter>Source Files\Engine</Filter>
-    </ClCompile>
-    <ClCompile Include="src\PhysicsEngine\PhysicsEngine.cpp">
-      <Filter>Source Files\PhysicsEngine</Filter>
+      <Filter>Source Files\Internal</Filter>
     </ClCompile>
     <ClCompile Include="src\Audio.cpp">
       <Filter>Source Files</Filter>
@@ -102,6 +99,45 @@
     <ClCompile Include="src\glmIncludes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\PhysicsEngine\PhysicsEngine.cpp">
+      <Filter>Source Files\PhysicsEngine</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Instance.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Surface.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\PhysicalDevice.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\QueueFamily.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\SwapChain.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\LogicalDevice.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Image.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Renderpass.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\DescriptorSetLayout.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Command.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Resource.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Framebuffer.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaderSrc\shader.vert">
@@ -125,7 +161,7 @@
     <None Include="shaderSrc\cool.frag">
       <Filter>Resource Files\shaders</Filter>
     </None>
-    <None Include="shaderSrc\new_shader.frag">
+    <None Include="shaderSrc\postProcess.frag">
       <Filter>Resource Files\shaders</Filter>
     </None>
     <None Include="shaderSrc\waving.vert">
@@ -134,15 +170,15 @@
     <None Include="x64\Release\res\data\user\main.json">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="shaderSrc\postProcess.vert">
+      <Filter>Resource Files\shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Audio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\Camera.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Engine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\Entity.h">
@@ -155,9 +191,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\Model.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\PhysicsEngine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\stb_image.h">
@@ -204,6 +237,48 @@
     </ClInclude>
     <ClInclude Include="imgui\imconfig.h">
       <Filter>Header Files\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PhysicsEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Engine.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Instance.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Surface.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PhysicalDevice.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\QueueFamily.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SwapChain.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\LogicalDevice.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Image.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Renderpass.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\DescriptorSetLayout.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Command.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Resource.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Framebuffer.h">
+      <Filter>Header Files\Internal</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
