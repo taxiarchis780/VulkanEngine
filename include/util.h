@@ -23,7 +23,9 @@ namespace util
 
 	int findHighestElementIfNotUnique(const std::vector<int>& totalStrength);
 
+	glm::vec2 worldToScreen(glm::vec3 pos, glm::mat4 proj, glm::mat4 view);
 	
+	bool isInsideQuadrilateral(const glm::vec2& click, const glm::vec2& A, const glm::vec2& B, const glm::vec2& C, const glm::vec2& D);
 }
 
 

@@ -10,4 +10,6 @@ void create_color_resources(VkDevice* device, VkPhysicalDevice* physicalDevice, 
 
 void create_depth_resources(VkDevice* device, VkPhysicalDevice* physicalDevice, it_ImageResource* depthImageRes, VkFormat swapChainImageFormat, VkExtent2D swapChainExtent, VkSampleCountFlagBits msaaSamples);
 
+void create_shadow_resources(VkDevice* device, VkPhysicalDevice* physicalDevice, it_ImageResource* shadowImageRes, VkFormat swapChainImageFormat, VkExtent2D swapChainExtent, VkSampleCountFlagBits msaaSamples);
+
 #endif

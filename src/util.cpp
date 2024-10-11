@@ -175,4 +175,49 @@ namespace util
 		}
 	}
 
+	glm::vec2 worldToScreen(glm::vec3 pos, glm::mat4 proj, glm::mat4 view)
+	{
+		glm::vec4 clipSpacePos = proj * (view * glm::vec4(pos, 1.0));
+		glm::vec3 ndcSpacePos;
+		glm::vec2 windowSpacePos;
+		if (!clipSpacePos.w) {
+			printf("Panik!");
+			throw std::runtime_error("ClipSpacePos.w was 0!! Cannot divide by 0!");
+		}
+
+		ndcSpacePos.x = clipSpacePos.x / clipSpacePos.w;
+		ndcSpacePos.y = clipSpacePos.y / clipSpacePos.w;
+		ndcSpacePos.z = clipSpacePos.z / clipSpacePos.w;
+
+		windowSpacePos.x = ((ndcSpacePos.x + 1.0) / 2.0);
+		windowSpacePos.y = 1.0f - ((ndcSpacePos.y + 1.0) / 2.0); // I want the screen coordinates to be on the first quadrant
+
+		return windowSpacePos;
+
+	}
+
+	bool isInsideQuadrilateral(const glm::vec2& click, const glm::vec2& A, const glm::vec2& B,
+		const glm::vec2& C, const glm::vec2& D) {
+		// Define the vertices of the quadrilateral
+		glm::vec2 vertices[4] = { A, B, C, D };
+
+		// Compute vectors from click point to each vertex
+		glm::vec2 vectors[4];
+		for (int i = 0; i < 4; ++i) {
+			vectors[i] = vertices[i] - click;
+		}
+
+		// Compute cross products
+		float crossProducts[4];
+		for (int i = 0; i < 4; ++i) {
+			int next = (i + 1) % 4;
+			crossProducts[i] = glm::cross(glm::vec3(vectors[i], 0.0f), glm::vec3(vectors[next], 0.0f)).z;
+		}
+
+		// Check if all cross products have the same sign
+		bool signCheck = (crossProducts[0] >= 0 && crossProducts[1] >= 0 && crossProducts[2] >= 0 && crossProducts[3] >= 0) ||
+			(crossProducts[0] <= 0 && crossProducts[1] <= 0 && crossProducts[2] <= 0 && crossProducts[3] <= 0);
+
+		return signCheck;
+	}
 }

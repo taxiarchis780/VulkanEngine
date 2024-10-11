@@ -34,6 +34,9 @@
     <Filter Include="Source Files\Internal">
       <UniqueIdentifier>{15df0eb7-805e-4f96-83b1-994a5d2c6eec}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\PhysicsEngine">
+      <UniqueIdentifier>{9c7cf871-1e85-4dd0-b8f3-1bfabe62ea39}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="imgui\imgui.cpp">
@@ -66,9 +69,6 @@
     <ClCompile Include="src\Engine\Buffer.cpp">
       <Filter>Source Files\Internal</Filter>
     </ClCompile>
-    <ClCompile Include="src\Engine\Debugger.cpp">
-      <Filter>Source Files\Internal</Filter>
-    </ClCompile>
     <ClCompile Include="src\Engine\Engine.cpp">
       <Filter>Source Files\Internal</Filter>
     </ClCompile>
@@ -82,9 +82,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Entity.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\JSONParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\main.cpp">
@@ -126,7 +123,7 @@
     <ClCompile Include="src\Engine\Renderpass.cpp">
       <Filter>Source Files\Internal</Filter>
     </ClCompile>
-    <ClCompile Include="src\Engine\DescriptorSetLayout.cpp">
+    <ClCompile Include="src\Engine\DescriptorSet.cpp">
       <Filter>Source Files\Internal</Filter>
     </ClCompile>
     <ClCompile Include="src\Engine\Command.cpp">
@@ -138,6 +135,27 @@
     <ClCompile Include="src\Engine\Framebuffer.cpp">
       <Filter>Source Files\Internal</Filter>
     </ClCompile>
+    <ClCompile Include="src\Engine\Texture.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\ResourceBuffer.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\SyncObject.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\GraphicsPipeline.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\Input.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\File.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\World.cpp">
+      <Filter>Source Files\Internal</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaderSrc\shader.vert">
@@ -146,31 +164,22 @@
     <None Include="notes.md">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="shaderSrc\laocoon.frag">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
-    <None Include="shaderSrc\depth.frag">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
-    <None Include="shaderSrc\displacement.vert">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
     <None Include="include\util.h">
       <Filter>Header Files</Filter>
-    </None>
-    <None Include="shaderSrc\cool.frag">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
-    <None Include="shaderSrc\postProcess.frag">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
-    <None Include="shaderSrc\waving.vert">
-      <Filter>Resource Files\shaders</Filter>
     </None>
     <None Include="x64\Release\res\data\user\main.json">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="shaderSrc\postProcess.vert">
+    <None Include="shaderSrc\shader.frag">
+      <Filter>Resource Files\shaders</Filter>
+    </None>
+    <None Include="shaderSrc\shader_no_normal.frag">
+      <Filter>Resource Files\shaders</Filter>
+    </None>
+    <None Include="shaderSrc\shadow.vert">
+      <Filter>Resource Files\shaders</Filter>
+    </None>
+    <None Include="shaderSrc\shadow.frag">
       <Filter>Resource Files\shaders</Filter>
     </None>
   </ItemGroup>
@@ -187,9 +196,6 @@
     <ClInclude Include="include\json.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\JSONParser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\Model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -200,9 +206,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\tinylogger.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Vertex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\glmIncludes.h">
@@ -238,9 +241,6 @@
     <ClInclude Include="imgui\imconfig.h">
       <Filter>Header Files\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\PhysicsEngine.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\Engine.h">
       <Filter>Header Files\Internal</Filter>
     </ClInclude>
@@ -268,7 +268,7 @@
     <ClInclude Include="include\Renderpass.h">
       <Filter>Header Files\Internal</Filter>
     </ClInclude>
-    <ClInclude Include="include\DescriptorSetLayout.h">
+    <ClInclude Include="include\DescriptorSet.h">
       <Filter>Header Files\Internal</Filter>
     </ClInclude>
     <ClInclude Include="include\Command.h">
@@ -280,5 +280,43 @@
     <ClInclude Include="include\Framebuffer.h">
       <Filter>Header Files\Internal</Filter>
     </ClInclude>
+    <ClInclude Include="include\Buffer.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Texture.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ResourceBuffer.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\SyncObject.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\GraphicsPipeline.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Input.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\File.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\PhysicsEngine.h">
+      <Filter>Header Files\PhysicsEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Vertex.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="include\World.h">
+      <Filter>Header Files\Internal</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="VulkanProject.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

@@ -22,6 +22,7 @@
 #include "glmIncludes.h"
 #include <chrono>
 #include <Model.h>
+#include <ResourceBuffer.h>
 
 class Camera {
 public:
@@ -35,6 +36,7 @@ public:
 	glm::vec3 Up = glm::vec3(0.0f, 0.0f, 1.0f);
 	glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec3 lightColor = glm::vec3(0.86275f, 0.70588f, 0.47059f);
+	glm::vec3 lightRot = glm::vec3(0.0f, 0.0f, 0.0f);
 	GLFWmonitor* monitor;
 	glm::mat4 lightMat;
 
@@ -45,16 +47,16 @@ public:
 	bool LockCamera = true; 
 	bool firstClick = true;
 
-
+	glm::vec3 offset = glm::vec3(10.0f);
 	
 	Camera(float width, float height);
 
 	void UpdateMatrices(Model* model);
 	int  pickModel(std::vector<Model*> scene, GLFWwindow* window);
 	void UpdateInputs(GLFWwindow* window, std::function<void(GLFWwindow*, Camera*)> cameraFunction = 0);
-	
 };
 
+void update_model_uniform_buffers(Model* cModel, Camera* camera, uint32_t currentImage);
 
 
 #endif

@@ -85,6 +85,11 @@ void Engine::renderImGui()
         ImGui::Text("Renderer: %s", RendererName.c_str());
 
         ImGui::Text("CURRENT SELECTED MODEL");
+        if (mCurrentSelectedModel)
+        {
+            ImGui::Text(mCurrentSelectedModel->NORMAL_PATH.c_str());
+            ImGui::Text("Current Pipeline: %d", mCurrentSelectedModel->pipelineIndex);
+        }
 
         uint8_t count = 0;
         for (size_t i = 0; i < scene.size(); ++i)
@@ -101,87 +106,34 @@ void Engine::renderImGui()
 
             ImGui::SameLine();
         }
-        if (ImGui::Checkbox("LightTranslate", &lightTranslateEnable) && lightTranslateEnable)
-        {
-            mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-        }
-
-
-
-
-        ImGui::Checkbox("EditScene", &editScene);
-        if (editScene)
-        {
-            ImGui::InputText("SceneName", &scene_name);
-            if (ImGui::Button("Refresh"))
-            {
-                findFiles("res/data/user/", ".json");
-            }
-            if (ImGui::BeginListBox("Scenes", ImVec2(200, 100))) {
-                static size_t item_current_idx = 0;
-                for (size_t i = 0; i < scene_paths.size(); ++i)
-                {
-                    const bool isSelected = (item_current_idx == i);
-                    if (ImGui::Selectable(scene_paths[i].c_str(), isSelected))
-                    {
-                        item_current_idx = i;
-                        scene_path = scene_paths[i];
-                    }
-                    if (isSelected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndListBox();
-            }
-            if (ImGui::Button("LoadScene"))
-            {
-                resetScene(ENGINE_LOAD_SCENE);
-            } ImGui::SameLine();
-            if (ImGui::Button("Delete Scene"))
-            {
-                
-                deleteFile(scene_path);
-            }
-            if (ImGui::Button("SaveToSelected"))
-            {
-                writeToFile(scene);
-            } ImGui::SameLine();
-            if (ImGui::Button("SaveToInput"))
-            {
-                scene_path = scene_name;
-                writeToFile(scene);
-            }
-            if (ImGui::Button("New Scene"))
-            {
-                scene_path = "res/data/system/empty.json";
-                resetScene(ENGINE_RESET_SCENE);
-            }
-        }
-
-        if (ImGui::Button("Update Graphics Pipeline"))
-        {
-           state = STATE_UPDATE_PIPELINE;
-        }
-
-
-        ImGui::InputText("VertexPath", &vert_path);
-        ImGui::InputText("FragmentPath", &frag_path);
-
-        if (ImGui::Button("Create Graphics Pipeline"))
-        {
-            createGraphicsPipelineWrapper(vert_path, frag_path);
-            shader_paths.push_back(vert_path);
-            shader_paths.push_back(frag_path);
-
-            shader_indices.push_back(std::vector<int>({ static_cast<int>(shader_paths.size() - 1), static_cast<int>(shader_paths.size()) }));
-
-        }
+        ImGui::Checkbox("LightTranslate", &lightTranslateEnable);
+        ImGui::NewLine();
         ImGui::SliderFloat3("LightPos", glm::value_ptr(camera->lightPos), -5.0f, 5.0f, NULL);
+        ImGui::SliderFloat3("LightRot", glm::value_ptr(camera->lightRot), -5.0f, 5.0f, NULL);
+        ImGui::SliderFloat3("LightOffset", glm::value_ptr(camera->offset), 10.0f, 100.0f, NULL);
         ImGui::ColorPicker3("lightColor", glm::value_ptr(camera->lightColor), ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_NoAlpha);
 
-        if (ImGui::SliderFloat("AudioVolume", &audioMgr->volume, 0.0f, 1.0f, NULL))
-        {
-            audioMgr->changeVolume();
-        }
+        ImGui::NewLine();
+        ImGui::Text("CURRENT GIZMO OPERATION:");
+        if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+            mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Rotation", mCurrentGizmoOperation == ImGuizmo::ROTATE))
+            mCurrentGizmoOperation = ImGuizmo::ROTATE;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
+            mCurrentGizmoOperation = ImGuizmo::SCALE;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
+            mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+        ImGui::Text("GuizmoMode");
+        if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
+            mCurrentGizmoMode = ImGuizmo::LOCAL;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
+            mCurrentGizmoMode = ImGuizmo::WORLD;
+
+        ImGui::NewLine();
         if (mCurrentSelectedModel)
         {
             ImGui::InputText("UUID", &mCurrentSelectedModel->UUID);
@@ -194,27 +146,25 @@ void Engine::renderImGui()
             ImGui::SliderFloat3("ModelRot", glm::value_ptr(mCurrentSelectedModel->rotationVec), 0.0f, 6.28f, NULL);
             ImGui::SliderFloat3("ModelScale", glm::value_ptr(mCurrentSelectedModel->scaleVec), 0.001f, 10.0f, NULL);
             
+            ImGui::Text("GraphicsPipeline");
+            uint8_t count1 = 0;
+            for (size_t i = 0; i < graphicsPipelines.size(); ++i)
+            {
+                count1++;
+                if (ImGui::RadioButton((std::to_string(i) + "##2").c_str(), mCurrentSelectedModel->pipelineIndex == i))
+                    mCurrentSelectedModel->pipelineIndex = (int)i;
+                if (count1 % 3 == 0)
+                {
+                    count1 = 0;
+                    ImGui::Spacing();
+                    continue;
+                }
 
+                ImGui::SameLine();
+            }
+            ImGui::NewLine();
 
-
-            ImGui::Text("CURRENT GIZMO OPERATION:");
-            if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
-                mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("Rotation", mCurrentGizmoOperation == ImGuizmo::ROTATE))
-                mCurrentGizmoOperation = ImGuizmo::ROTATE;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
-                mCurrentGizmoOperation = ImGuizmo::SCALE;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL))
-                mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
-            ImGui::Text("GuizmoMode");
-            if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
-                mCurrentGizmoMode = ImGuizmo::LOCAL;
-            ImGui::SameLine();
-            if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
-                mCurrentGizmoMode = ImGuizmo::WORLD;
+            
 
 
             //ImGuiColorEditFlags_PickerHueWheel
@@ -223,28 +173,116 @@ void Engine::renderImGui()
             ImGui::SliderFloat3("Diffuse", glm::value_ptr(mCurrentSelectedModel->material.diffuse), 0.0f, 10.0f, NULL);
             ImGui::SliderFloat3("Specular", glm::value_ptr(mCurrentSelectedModel->material.specular), 0.0f, 10.0f, NULL);
             ImGui::SliderFloat("Shininess", &mCurrentSelectedModel->material.shininess.r, 0.1f, 360.0f, NULL, ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderFloat3("Color", glm::value_ptr(mCurrentSelectedModel->material.overrideColor), 0.0f, 10.0f, NULL);
+        }
+
+        if (ImGui::SliderFloat("AudioVolume", &audioMgr->volume, 0.0f, 1.0f, NULL))
+        {
+            audioMgr->changeVolume();
+        }
+
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Scene"))
+    {
+        ImGui::NewLine();
+        
+        ImGui::InputText("SceneName", &scene_name);
+        
+        ImGui::SameLine();
+        if (ImGui::Button("Search##sceneName", ImVec2(50, 20)))
+        {
+            scene_path = pick_file(EXTENSIONS_SERIALIZATION);
+            scene_name = scene_path;
+        }
+
+        if (ImGui::Button("LoadScene"))
+        {
+            resetScene(ENGINE_LOAD_SCENE);
+        } ImGui::SameLine();
+        if (ImGui::Button("Delete Scene"))
+        {
+
+            delete_file(scene_path);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save"))
+        {
+            scene_path = scene_name;
+            write_file(scene, scene_path, &shader_paths, &shader_indices, camera);
+        }
+        
+        if (ImGui::Button("New Scene"))
+        {
+            scene_path = "res/data/system/empty.json";
+            resetScene(ENGINE_RESET_SCENE);
+        }
+        
+        ImGui::NewLine();
+        if (ImGui::Button("Update Graphics Pipeline"))
+        {
+            state = STATE_UPDATE_PIPELINE;
+        }
+
+
+        ImGui::InputText("VertexPath", &vert_path);
+        ImGui::SameLine();
+        if (ImGui::Button("Search##VertexPath", ImVec2(50, 20)))
+        {
+            vert_path = pick_file(EXTENSIONS_SHADERS);
+        }
+        ImGui::InputText("FragmentPath", &frag_path);
+        ImGui::SameLine();
+        if (ImGui::Button("Search##FragPath", ImVec2(50, 20)))
+        {
+            frag_path = pick_file(EXTENSIONS_SHADERS);
+        }
+
+        if (ImGui::Button("Create Graphics Pipeline"))
+        {
+            create_graphics_pipeline(&device, static_cast<int>(graphicsPipelines.size()), vert_path, frag_path,
+                &pipelineLayouts, &graphicsPipelines, msaaSamples, descriptorSetLayout, renderPass);
+            shader_paths.push_back(vert_path);
+            shader_paths.push_back(frag_path);
+
+            shader_indices.push_back(std::vector<int>({ static_cast<int>(shader_paths.size() - 1), static_cast<int>(shader_paths.size()) }));
 
         }
 
+        ImGui::NewLine();
+
         ImGui::InputText("Model", &model_path);
+        ImGui::SameLine();
+        if(ImGui::Button("Search##model", ImVec2(50, 20)))
+        {
+            model_path = pick_file(EXTENSIONS_MODELS);
+        }
         ImGui::InputText("Texture", &texture_path);
+        ImGui::SameLine();
+        if (ImGui::Button("Search##texture", ImVec2(50, 20)))
+        {
+            texture_path = pick_file(EXTENSIONS_IMAGES);
+        }
+        ImGui::InputText("Normal", &normal_path);
+        ImGui::SameLine();
+        if (ImGui::Button("Search##normal", ImVec2(50, 20)))
+        {
+            normal_path = pick_file(EXTENSIONS_IMAGES);
+        }
+
         if (ImGui::Button("Add Model"))
         {
-            Model* cModel = nullptr;
+            Model* cModel = new Model;
             try {
-                cModel = new Model("models/" + model_path, "textures/" + texture_path);
+                init_model(cModel, "models/" + model_path, "textures/" + texture_path);
                 util::GenerateUUID(cModel, 8, true);
-                loadModel(cModel);
-                createTextureImage(cModel);
-                createTextureImageView(cModel);
-                createTextureSampler(cModel);
-                createVertexBuffer(cModel);
-                createIndexBuffer(cModel);
-                createUniformBuffers(cModel);
-                createDescriptorPool(cModel);
-                createDescriptorSets(cModel);
-                addtoScene(cModel);
-                statsFaces += cModel->statsFaces;
+                if (!normal_path.empty())
+                {
+                    cModel->NORMAL_PATH = "textures/" + normal_path;
+                }
+                load_model(cModel);
+                init_model_resources(&device, &physicalDevice, commandPool, graphicsQueue, cModel, &depthImageRes,&lightRes.lightBuffers);
+                scene.push_back(cModel);
             }
             catch (const std::exception& e) {
                 delete cModel;
@@ -270,55 +308,11 @@ void Engine::renderImGui()
             {
                 scene.push_back(newScene[i]);
             }
-            statsFaces -= mCurrentSelectedModel->statsFaces;
-        }
-
-        ImGui::Checkbox("AddModel", &addModel);
-        if (addModel)
-        {
-            if (ImGui::Button("Refresh"))
-            {
-                traceDir("res/models/", "res/textures/");
-            }
-            if (ImGui::BeginListBox("Models", ImVec2(200, 100))) {
-                static size_t item_current_idx = 0;
-                for (size_t i = 0; i < model_paths.size(); ++i)
-                {
-                    const bool isSelected = (item_current_idx == i);
-                    if (ImGui::Selectable(model_paths[i].c_str(), isSelected))
-                    {
-                        item_current_idx = i;
-                        model_path = model_paths[i];
-                    }
-                    if (isSelected)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndListBox();
-            }
-
-            if (ImGui::BeginListBox("Textures", ImVec2(200, 100))) {
-                static size_t item_current_idx2 = 0;
-                for (size_t i = 0; i < texture_paths.size(); ++i)
-                {
-                    const bool isSelected = (item_current_idx2 == i);
-                    if (ImGui::Selectable(texture_paths[i].c_str(), isSelected))
-                    {
-                        item_current_idx2 = i;
-                        texture_path = texture_paths[i];
-                    }
-                    if (isSelected)
-                        ImGui::SetItemDefaultFocus();
-                }
-
-                ImGui::EndListBox();
-            }
-
         }
 
         ImGui::EndTabItem();
     }
-
-    if (ImGui::BeginTabItem("Scene"))
+    if (ImGui::BeginTabItem("Stats"))
     {
         isComponentSelected = false;
         if (ImGui::BeginTable("CameraPos", 4))
@@ -426,7 +420,7 @@ void Engine::renderImGui()
                 mCurrentSelectedModel->scaleVec = scale;
             }
         }
-        else if (mCurrentSelectedModel != nullptr) {
+        else if(lightTranslateEnable) {
             ImGuizmo::Manipulate(glm::value_ptr(camera->view), glm::value_ptr(camera->proj), mCurrentGizmoOperation, mCurrentGizmoMode, glm::value_ptr(camera->lightMat));
 
             if (ImGuizmo::IsUsing())
@@ -434,7 +428,7 @@ void Engine::renderImGui()
                 glm::vec3 translation, rotation, scale;
                 util::DecomposeTransform(camera->lightMat, translation, rotation, scale);
                 camera->lightPos = translation;
-
+                camera->lightRot = rotation;
             }
         }
 

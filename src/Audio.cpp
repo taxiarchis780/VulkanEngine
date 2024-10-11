@@ -18,7 +18,7 @@ Audio::Audio()
 		throw std::runtime_error("ERROR: FMOD::System failed to initialize");
 	}
 
-	result = system->createSound("res/audio/Ohne Dich.mp3", FMOD_DEFAULT, 0, &sound);
+	result = system->createSound("res/audio/song_of_healing.mp3", FMOD_DEFAULT, 0, &sound);
 	if (result != FMOD_OK)
 	{
 		throw std::runtime_error("ERROR: FMOD failed to create sound");

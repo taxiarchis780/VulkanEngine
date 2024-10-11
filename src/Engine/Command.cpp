@@ -55,14 +55,14 @@ void create_command_pool(VkDevice* device, VkPhysicalDevice* physicalDevice, VkC
 
 void create_commandbuffer(VkDevice* device, std::vector<VkCommandBuffer>* commandBuffers, VkCommandPool commandPool)
 {
-    (*commandBuffers).resize(MAX_FRAMES_IN_FLIGHT);
+    commandBuffers->resize(MAX_FRAMES_IN_FLIGHT);
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = (uint32_t)(*commandBuffers).size();
 
-    if (vkAllocateCommandBuffers(*device, &allocInfo, (*commandBuffers).data()) != VK_SUCCESS)
+    if (vkAllocateCommandBuffers(*device, &allocInfo, commandBuffers->data()) != VK_SUCCESS)
     {
         throw std::runtime_error("ERROR: failed to allocate command buffers!");
     }

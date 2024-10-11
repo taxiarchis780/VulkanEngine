@@ -1,5 +1,7 @@
 #ifndef __ENGINE_CLASS__
 #define __ENGINE_CLASS__
+
+
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -13,10 +15,20 @@
 #include "LogicalDevice.h"
 #include "Image.h"
 #include "Renderpass.h"
-#include "DescriptorSetLayout.h"
+#include "DescriptorSet.h"
 #include "Command.h"
 #include "Resource.h"
 #include "Framebuffer.h"
+#include "Buffer.h"
+#include "Texture.h"
+#include "ResourceBuffer.h"
+#include "SyncObject.h"
+#include "Model.h"
+#include "Camera.h"
+#include "GraphicsPipeline.h"
+#include "File.h"
+#include "World.h"
+
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -25,11 +37,10 @@
 #include <ImGuizmo.h>
 #include <tinylogger.h>
 #include <json.hpp>
-#include <Model.h>
-#include <Camera.h>
+
 #include <Audio.h>
 #include <PhysicsEngine.h>
-#include <util.h>
+
 #include <memory>
 #include <iostream>
 #include <filesystem>
@@ -39,18 +50,12 @@
 #include <mutex>
 #include <stdexcept>
 #include <vector>
-#include <set>
-#include <array>
-#include <optional>
-#include <cstring>
-#include <cstdint>
-#include <limits>
-#include <algorithm>
-#include <cstdlib>
+
 #define ENGINE_LOAD_SCENE 1
 #define ENGINE_RESET_SCENE 0
 
 using json = nlohmann::ordered_json;
+
 
 enum SCENE_STATE
 {
@@ -62,7 +67,6 @@ enum SCENE_STATE
     
     STATE_RESET_AND_UPDATE_SCENE = STATE_RESET_SCENE | STATE_UPDATE_SCENE
 };
-
 
 
 class Engine {
@@ -78,6 +82,7 @@ public:
     void setCustomMouseButtonCallbackFunction(std::function<void(GLFWwindow*, int, int, int)> custom_mouse_button_callback);
     void setCustomMainUpdate(std::function<void(void)> custom_main_update);
     
+    HWND getHWND();
 
     bool framebufferResized = false;
     bool swapChainConfigChanged = false;
@@ -85,6 +90,8 @@ public:
 
     
     VkInstance instance;
+
+    std::vector<Model*> scene;
 private:
     uint32_t WIDTH, HEIGHT = 0;
     std::vector<std::string> model_paths;
@@ -100,6 +107,7 @@ private:
     
     std::string texture_path;
     std::string model_path;
+    std::string normal_path;
     std::string scene_path;
     std::string scene_name;
     std::string vert_path;
@@ -128,10 +136,9 @@ private:
     bool VSync = false;
     bool PresentModeChange = false;
         
-    double lastTime = 0.0; // for window title
-    double lastTime1 = 0.0; // for physics to be processed
+    double lastTimeWindowTitle = 0.0; // for window title
+    double lastTime = 0.0; // for physics to be processed
     double fps = 0.0;
-    uint32_t statsFaces = 0;
     int nbFrames = 0;
     int currentPipeline = 0;
 
@@ -141,7 +148,7 @@ private:
     
     size_t sceneSize;
     Model* mCurrentSelectedModel;
-    std::vector<Model*> scene;
+    
     ImGuiIO io;  
     Audio* audioMgr;
     PhysicsEngine* physicsEngine;
@@ -149,8 +156,8 @@ private:
     GLFWwindow* window;
     GLFWmonitor* monitor;
     const GLFWvidmode* videoMode;
+    HWND hwnd;
     
-    VkDebugUtilsMessengerEXT debugMessenger;
     VkPhysicalDevice physicalDevice;
     VkDevice device;
     VkQueue graphicsQueue;
@@ -161,19 +168,23 @@ private:
 
     Camera* camera;
     
+    VkFramebuffer shadowFramebuffer;
     
     VkRenderPass renderPass;
+    VkRenderPass shadowRenderPass;
+
     std::vector<VkPipeline> graphicsPipelines;
     std::vector<VkPipelineLayout> pipelineLayouts;
-    VkPipeline postProcessingGraphicsPipeline;
-    VkPipelineLayout postProcessingGraphicsPipelineLayout;    
-    VkDescriptorPool postProcessingDescriptionPool;
-    VkDescriptorSetLayout postProcessingDescriptorSetLayout;
-    VkDescriptorSet postProcessingDescriptorSet;
+
+    VkPipeline shadowPipeline;
+    VkPipelineLayout shadowPipelineLayout;
+
     VkCommandPool commandPool;
     VkDescriptorPool descriptorPool;
     it_ImageResource depthImageRes;
     it_ImageResource colorImageRes;
+    it_ImageResource shadowImageRes;
+    it_lightBufferResource lightRes;
     VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;  
     VkDescriptorPool imGuiDP;
     std::vector<VkCommandBuffer> commandBuffers;
@@ -214,65 +225,23 @@ private:
     void initVulkan();
     void initImGui();
     
-    void setupDebugMessenger();
     void mainLoop();
-
     
-    
-    void createGraphicsPipeline(int index, std::string vertShaderPath, std::string fragShaderPath);
-    void createGraphicsPipelineWrapper(std::string vertShaderPath, std::string fragShaderPath);
-    void createPostProcessingGraphicsPipeline(std::string vertShaderPath, std::string fragShaderPath);
-    void createSyncObjects();
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-    void createVertexBuffer(Model* model);
-    void createIndexBuffer(Model* model);
-    void createUniformBuffers(Model* model);
-    void updateUniformBuffers(uint32_t currentImage, Model* model);
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-    void createPostProcessingDescriptorSets();
-    void createDescriptorSetLayoutForModel(Model* model);
-    
-    void createDescriptorSets(Model* model);
-    void createDescriptorPool(Model* model);
     void drawFrame();
-    void loadModel(Model* model);
-    void createTextureImage(Model* model);
-    void createTextureImageView(Model* model);
-    void createTextureSampler(Model* model);
     
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
     void drawWindowTitle();
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
     void renderImGui();
-    void loadScene();
     void loadShaders();
-    void writeToFile(std::vector<Model*> scene);
-    void loadFile(std::string fileName);
-    void deleteFile(std::string fileName);
     void resetScene(bool toUpdate = false);
-    void addtoScene(Model* model);
     void traceDir(std::string modelDirectory, std::string textureDirectory);
     void createImGuiDP();
-    void findFiles(std::string sceneDirectory, std::string fileExtension);
-    void cleanUpModel(Model* model);
-    void updateImGui(VkCommandBuffer commandBuffer);
-    void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
-    void createNormal(Model* cModel);
-    void processState();
     
-    bool checkValidationLayerSupport();
-    VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
-    void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
-    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
-    std::vector<const char*> getRequiredExtensions();
-    VkShaderModule createShaderModule(const std::vector<char>& code);
-    VkSampleCountFlagBits getMaxUsableSampleCount();
-
+    void updateImGui(VkCommandBuffer commandBuffer);
+    void processState();
     
 
     //bool hasStencilComponent(VkFormat format);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-    void Draw(Model* cModel, VkCommandBuffer commandBuffer, VkPipelineLayout graphicsPipelineLayout, int currentFrame);
     void cleanup();
 
     static void mouse_callback(GLFWwindow* window, int key, int action, int mods);

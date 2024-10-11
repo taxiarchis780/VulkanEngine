@@ -1,9 +1,12 @@
 #pragma once
 #define __MODEL_CLASS__
 #include <Vertex.h>
+#include <Image.h>
 #include <string>
 #include <tinylogger.h>
 #include <vector>
+#include <thread>
+#include <mutex>
 /*
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -21,29 +24,19 @@
 #include <vulkan/vulkan.h>
 #include <PxPhysicsAPI.h>
 
-struct UniformBufferObject
-{
-	glm::mat4 transform;
-	glm::mat4 view;
-	glm::mat4 proj;
-	glm::vec3 cameraPos;
-	glm::vec3 lightPos;
-	glm::vec3 lightColor;
-	Material material;
-	float time;
-};
 
 
-class Model
+
+
+struct Model
 {
-public:
 	std::string MODEL_PATH;
 	std::string TEXTURE_PATH;
 	std::string NORMAL_PATH;
 	std::string UUID = std::string("");
 	std::string baseDir = "res/";
 	glm::mat4 transform;
-	Model(std::string MODEL_PATH, std::string TEXTURE_PATH);
+	//Model(std::string MODEL_PATH, std::string TEXTURE_PATH);
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 	
@@ -82,6 +75,16 @@ public:
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 	std::vector<void*> uniformBuffersMapped;
 
-private:
-	
 };
+
+void init_model(Model* cModel, std::string MODEL_PATH, std::string TEXTURE_PATH);
+
+void cleanup_model(VkDevice* device, Model* cModel);
+
+void load_model(Model* cModel);
+
+void init_model_resources(VkDevice* device, VkPhysicalDevice* physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue, Model* cModel, it_ImageResource* depthRes, std::vector<VkBuffer>* lightBuffers);
+void mt_init_model_resources(VkDevice* device, VkPhysicalDevice* physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue, Model* cModel, it_ImageResource* depthRes, std::vector<VkBuffer>* lightBuffers, std::mutex& queueMutex);
+
+void draw_model(Model* cModel, VkCommandBuffer commandBuffer, VkPipelineLayout graphicsPipelineLayout, int currentFrame);
+

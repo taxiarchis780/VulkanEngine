@@ -141,6 +141,7 @@ void cleanupSwapChain(VkDevice* device, it_SwapChainHandle* swapChainHandle, it_
     vkDestroyImageView(*device, depthImageRes->imageView, nullptr);
     vkDestroyImage(*device, depthImageRes->image, nullptr);
     vkFreeMemory(*device, depthImageRes->memory, nullptr);
+    vkDestroySampler(*device, depthImageRes->sampler, nullptr);
     for (size_t i = 0; i < swapChainHandle->framebuffers.size(); i++)
         vkDestroyFramebuffer(*device, swapChainHandle->framebuffers[i], nullptr);
     for (size_t i = 0; i < swapChainHandle->imageViews.size(); i++)

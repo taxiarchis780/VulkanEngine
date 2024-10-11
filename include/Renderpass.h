@@ -17,5 +17,6 @@ struct it_RenderPass
 
 
 void create_render_pass(VkDevice* device, VkPhysicalDevice* physicalDevice, VkRenderPass* renderPass, VkFormat swapChainImageFormat, VkSampleCountFlagBits msaaSamples);
+void create_shadow_render_pass(VkDevice* device, VkPhysicalDevice* physicalDevice, VkRenderPass* shadowRenderPass, VkSampleCountFlagBits msaaSamples);
 
 #endif

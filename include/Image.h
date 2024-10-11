@@ -5,12 +5,17 @@
 #include <stdexcept>
 #include <vector>
 
+#include "Command.h"
+
 struct it_ImageResource
 {
 	VkImageView		imageView;
 	VkImage			image;
 	VkDeviceMemory  memory;
+	VkSampler       sampler;
 };
+
+void transition_image_layout(VkDevice* device, VkCommandPool commandPool, VkQueue graphicsQueue, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
 
 VkFormat findDepthFormat(VkPhysicalDevice physicalDevice);
 
@@ -21,5 +26,7 @@ void createImage(VkDevice* device, VkPhysicalDevice* physicalDevice, uint32_t wi
 VkImageView createImageView(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
 
 void create_imageviews(VkDevice* device, std::vector<VkImageView>* swapChainImageViews, std::vector<VkImage>* swapChainImages, VkFormat swapChainImageFormat);
+
+void transitionShadowMapForShaderAccess(VkCommandBuffer commandBuffer, VkImage* shadowImage);
 
 #endif
